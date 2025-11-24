@@ -67,7 +67,7 @@ Visualize the distribution of default payment status to assess class balance.
 
 ```{r target-dist}
 df |> ggplot(aes(x = factor(`default payment next month`))) +
-  geom_bar(fill = "steelblue") +
+  geom_bar(fill = "steelblue", width = 0.5) +
   labs(title = "Distribution of Default Payment",
        x = "Default (0 = No, 1 = Yes)",
        y = "Count") +
@@ -98,13 +98,13 @@ head(corr_df, 15)
 
 Visualize the top 15 correlations with the target variable using a horizontal bar plot. Red bars indicate positive correlation (increases default risk), blue bars indicate negative correlation (reduces default risk).
 
-```{r corr-barplot, fig.width=10, fig.height=6}
+```{r corr-barplot, fig.width=8, fig.height=5}
 corr_df |>
   head(15) |>
   ggplot(aes(x = reorder(Variable, abs(Correlation)), 
              y = Correlation,
              fill = ifelse(Correlation > 0, "Positive", "Negative"))) +
-  geom_bar(stat = "identity") +
+  geom_bar(stat = "identity", width = 0.6) +
   coord_flip() +
   labs(title = "Top 15 Features Correlated with Default Payment",
        x = "Features",
@@ -347,8 +347,8 @@ legend("bottomright", paste("AUC =", round(auc_value, 4)))
 
 ### ROC Analysis and Model Discrimination
 
-**AUC: 0.7117**
+**AUC: 0.7236**
 
-The Area Under the ROC Curve (AUC) of 0.7117 indicates good discriminative ability. The model performs significantly better than random classification (AUC = 0.5), demonstrating its effectiveness in distinguishing between default and non-default cases. However, there is room for improvement, as an AUC greater than 0.80 would indicate excellent discrimination.
+The Area Under the ROC Curve (AUC) of 0.7236 indicates good discriminative ability. The model performs significantly better than random classification (AUC = 0.5), demonstrating its effectiveness in distinguishing between default and non-default cases. However, there is room for improvement, as an AUC greater than 0.80 would indicate excellent discrimination.
 
 The ROC curve visualizes the trade-off between sensitivity (true positive rate) and specificity (1 - false positive rate) across different classification thresholds. The current threshold of 0.5 produces the high specificity and low sensitivity observed in the confusion matrix.
