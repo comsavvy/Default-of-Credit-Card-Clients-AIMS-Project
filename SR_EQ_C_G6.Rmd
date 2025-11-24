@@ -16,9 +16,13 @@ knitr::opts_chunk$set(echo = TRUE)
 Load required packages for data manipulation, reading Excel files, and correlation visualization.
 
 ```{r load-libraries}
-library(tidyverse)
-library(readxl)
-library(corrplot)
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(readxl)
+  library(corrplot)
+  library(caret)
+  library(pROC)
+})
 ```
 
 ## Load Data
@@ -106,56 +110,245 @@ corr_df |>
        x = "Features",
        y = "Correlation Coefficient",
        fill = "Correlation Type") +
-  scale_fill_manual(values = c("Positive" = "#e74c3c", "Negative" = "#3498db")) +
+  scale_fill_manual(values = c("Positive" = "#3498db", "Negative" = "#e74c3c")) + #nolint
   theme_minimal() +
   theme(axis.text = element_text(size = 10),
         plot.title = element_text(size = 12, face = "bold"))
 ```
 
-## Outlier Detection
+# Feature Selection and Modeling
 
-Detect outliers using the Interquartile Range (IQR) method. Display the count of outliers for each numerical variable.
+## Prepare Data for Modeling
 
-```{r outlier-detection}
-# Function to detect outliers using IQR method
-detect_outliers <- function(x) {
-  Q1 <- quantile(x, 0.25, na.rm = TRUE)
-  Q3 <- quantile(x, 0.75, na.rm = TRUE)
-  IQR <- Q3 - Q1
-  lower_bound <- Q1 - 1.5 * IQR
-  upper_bound <- Q3 + 1.5 * IQR
-  sum(x < lower_bound | x > upper_bound, na.rm = TRUE)
+Prepare the dataset by converting the target variable to a factor for logistic regression.
+
+```{r prepare-data}
+df$`default payment next month` <- factor(df$`default payment next month`, levels = c(0, 1)) # nolint
+```
+
+## Full Logistic Regression Model
+
+Build logistic regression model with all features.
+
+```{r full-model, warning=FALSE, cache=TRUE}
+full_model <- glm(`default payment next month` ~ ., 
+                   data = df, 
+                   family = binomial(link = "logit"))
+
+summary(full_model)
+```
+
+## Individual Feature AIC Evaluation
+
+Evaluate each feature's contribution to model fit using AIC.
+
+```{r feature-aic-eval, warning=FALSE, cache=TRUE}
+feature_names <- colnames(df)[colnames(df) != "default payment next month"]
+
+feature_aic <- data.frame(
+  Feature = feature_names,
+  AIC = NA
+)
+
+for (i in seq_along(feature_names)) {
+  formula <- paste("`default payment next month` ~", feature_names[i])
+  model <- glm(as.formula(formula), data = df, family = binomial(link = "logit"))
+  feature_aic$AIC[i] <- AIC(model)
 }
 
-# Count outliers for each numerical variable
-outlier_counts <- sapply(df, detect_outliers)
-outlier_summary <- data.frame(
-  Variable = names(outlier_counts),
-  Outlier_Count = outlier_counts
+feature_aic <- feature_aic |>
+  arrange(AIC) |>
+  mutate(Delta_AIC = AIC - min(AIC))
+
+print(feature_aic)
+```
+
+PAY_0 (most recent repayment status) is the strongest individual predictor with lowest AIC of 28535.57. PAY_2 and PAY_3 follow as secondary predictors. Bill amounts and age have higher AIC values, indicating weaker individual predictive power.
+
+## Stepwise Feature Selection using AIC
+
+Use stepwise selection to identify important features based on AIC.
+
+```{r stepwise-selection, warning=FALSE, cache=TRUE}
+step_model <- step(full_model, direction = "both", trace = 0)
+
+summary(step_model)
+```
+
+## Model Comparison
+
+Compare AIC values for full model and stepwise selected model.
+
+```{r model-comparison}
+cat("Full Model AIC:", AIC(full_model), "\n")
+cat("Stepwise Model AIC:", AIC(step_model), "\n")
+cat("Difference:", AIC(full_model) - AIC(step_model), "\n")
+```
+
+The stepwise model reduces AIC by 7.51 points by removing 5 less important features. This indicates the stepwise model with 18 features provides a better balance between model fit and complexity than the full model with 23 features.
+
+## Feature Importance and Coefficients
+
+Coefficients and p-values for the selected model.
+
+```{r feature-importance}
+model_coef <- data.frame(
+  Feature = names(coef(step_model)),
+  Coefficient = coef(step_model)
 ) |>
-  filter(Outlier_Count > 0) |>
-  arrange(desc(Outlier_Count))
+  mutate(Coefficient = round(Coefficient, 6))
 
-print(outlier_summary)
+p_values <- summary(step_model)$coefficients[, "Pr(>|z|)"]
+model_coef$P_Value <- p_values[match(model_coef$Feature, names(p_values))]
+model_coef$Significance <- ifelse(model_coef$P_Value < 0.001, "***",
+                                   ifelse(model_coef$P_Value < 0.01, "**",
+                                          ifelse(model_coef$P_Value < 0.05, "*", "")))
+
+print(model_coef)
 ```
 
-## Outlier Visualization
+PAY_0 has the strongest effect with coefficient of 0.578, indicating recent payment delays significantly increase default risk. MARRIAGE, SEX, and EDUCATION show protective effects with negative coefficients. All features except intercept are statistically significant at p \< 0.05 level.
 
-Create boxplots for the top features to visualize outliers.
+# Model Evaluation
 
-```{r outlier-boxplots, fig.width=12, fig.height=8}
-top_features <- corr_df$Variable[1:6]
+## Train-Test Split
 
-df |>
-  select(all_of(top_features)) |>
-  pivot_longer(everything(), names_to = "Variable", values_to = "Value") |>
-  ggplot(aes(x = Variable, y = Value)) +
-  geom_boxplot(fill = "lightblue", outlier.color = "red", outlier.size = 2) +
-  facet_wrap(~Variable, scales = "free") +
-  labs(title = "Boxplots of Top 6 Features - Outlier Detection",
-       x = "Features",
-       y = "Values") +
-  theme_minimal() +
-  theme(axis.text.x = element_blank(),
-        plot.title = element_text(size = 12, face = "bold"))
+Split dataset into 70% training and 30% testing sets for model evaluation.
+
+```{r train-test-split}
+set.seed(42)
+n <- nrow(df)
+train_idx <- sample(1:n, size = 0.7 * n)
+train_data <- df[train_idx, ]
+test_data <- df[-train_idx, ]
+
+cat("Training set size:", nrow(train_data), "\n")
+cat("Test set size:", nrow(test_data), "\n")
 ```
+
+## Train Model on Training Set
+
+Fit the stepwise model on training data.
+
+```{r train-model, warning=FALSE}
+train_model <- glm(`default payment next month` ~ PAY_0 + PAY_2 + PAY_3 + PAY_4 + PAY_5 + 
+                     PAY_6 + LIMIT_BAL + PAY_AMT1 + MARRIAGE + SEX + EDUCATION + 
+                     AGE + PAY_AMT2 + PAY_AMT4 + PAY_AMT3 + PAY_AMT5 + BILL_AMT1 + 
+                     PAY_AMT6 + BILL_AMT2,
+                   data = train_data,
+                   family = binomial(link = "logit"))
+
+summary(train_model)
+```
+
+## Model Predictions
+
+Generate predictions on test set.
+
+```{r predictions}
+pred_prob <- predict(train_model, newdata = test_data, type = "response")
+pred_class <- ifelse(pred_prob > 0.5, 1, 0)
+
+cat("Prediction probability range:", min(pred_prob), "to", max(pred_prob), "\n")
+cat("Number of predicted defaults:", sum(pred_class == 1), "\n")
+cat("Number of predicted non-defaults:", sum(pred_class == 0), "\n")
+```
+
+## Confusion Matrix and Performance Metrics
+
+Calculate confusion matrix and performance metrics using caret package.
+
+```{r confusion-matrix}
+actual <- as.factor(as.numeric(test_data$`default payment next month`) - 1)
+pred_class <- as.factor(pred_class)
+
+cm <- confusionMatrix(pred_class, actual, positive = "1")
+print(cm)
+```
+
+## Extract and Display Performance Metrics
+
+Extract key metrics from the confusion matrix object.
+
+```{r extract-metrics}
+metrics <- cm$byClass
+overall_metrics <- cm$overall
+
+accuracy <- overall_metrics["Accuracy"]
+sensitivity <- metrics["Sensitivity"]
+specificity <- metrics["Specificity"]
+precision <- metrics["Pos Pred Value"]
+balanced_acc <- metrics["Balanced Accuracy"]
+```
+
+## Performance Metrics
+
+```{r display-metrics}
+cat("Performance Metrics:\n")
+cat("Accuracy:         ", round(accuracy, 4), "\n")
+cat("Sensitivity:      ", round(sensitivity, 4), "\n")
+cat("Specificity:      ", round(specificity, 4), "\n")
+cat("Precision:        ", round(precision, 4), "\n")
+cat("Balanced Accuracy:", round(balanced_acc, 4), "\n")
+```
+
+## Metric Definitions
+
+-   **Accuracy**: (TP + TN) / Total = Overall correct predictions across both classes
+-   **Sensitivity (Recall)**: TP / (TP + FN) = Proportion of actual defaults correctly identified
+-   **Specificity**: TN / (TN + FP) = Proportion of actual non-defaults correctly identified\
+-   **Precision**: TP / (TP + FP) = Of all predicted defaults, how many are actually correct
+-   **Balanced Accuracy**: (Sensitivity + Specificity) / 2 = Average of sensitivity and specificity, accounting for class imbalance
+
+## Model Interpretation and Performance Analysis
+
+### Performance Metrics Summary
+
+| Metric            | Value  | Interpretation                                         |
+|-------------------|--------|--------------------------------------------------------|
+| Accuracy          | 81.34% | Overall correct predictions across both classes        |
+| Sensitivity       | 25.09% | Proportion of actual defaults correctly identified     |
+| Specificity       | 96.98% | Proportion of actual non-defaults correctly identified |
+| Precision         | 69.74% | Of predicted defaults, how many are actually correct   |
+| Balanced Accuracy | 61.03% | Average performance accounting for class imbalance     |
+
+### Detailed Performance Analysis
+
+**Accuracy (81.34%): Overall Correctness** - The model correctly classifies 81.34% of all cases (both defaults and non-defaults) - 95% confidence interval: [80.52%, 82.14%] indicates a reliable estimate
+
+**Sensitivity (25.09%): Default Detection Rate** - Of 1,957 actual defaults in the test set, the model identifies only 491 (25.09%) - The model misses 1,466 actual defaults (false negatives) - This low sensitivity indicates the model is conservative in flagging defaults
+
+**Specificity (96.98%): Non-Default Identification** - Of 7,043 actual non-defaults, the model correctly identifies 6,830 (96.98%) - Only 213 false positives (non-defaults incorrectly flagged as defaults) - The model excels at identifying genuine non-defaulters and avoiding unnecessary interventions
+
+**Precision (69.74%): Prediction Reliability** - Of 704 cases predicted as defaults, 491 are actually defaults - When the model predicts a default, it is correct approximately 70% of the time - This precision level is acceptable for risk management applications
+
+**Balanced Accuracy (61.03%): Class-Imbalance Adjusted Performance** - Average of sensitivity (25.09%) and specificity (96.98%) - Accounts for class imbalance where only 21.7% of the population are actual defaults - Demonstrates balanced performance across both classes
+
+### Business Implications
+
+-   **Model Conservatism**: The model rarely predicts defaults due to severe class imbalance (\~22% defaults in the dataset)
+-   **High Specificity Benefit**: A 96.98% specificity minimizes false alarms to customers, avoiding unnecessary interventions
+-   **Low Sensitivity Trade-off**: A 25.09% sensitivity means the model misses 3 of 4 actual defaults
+-   **Use Case Fit**: This model is better suited for avoiding customer inconvenience than for catching all potential defaults
+-   **Potential Improvements**: Classification threshold adjustment or class weighting techniques could improve sensitivity at the cost of specificity
+
+## ROC Curve and AUC
+
+Generate ROC curve and calculate AUC to evaluate model discrimination ability.
+
+```{r roc-curve, fig.width=8, fig.height=6}
+roc_obj <- roc(actual, pred_prob)
+auc_value <- auc(roc_obj)
+
+plot(roc_obj, main = "ROC Curve", col = "steelblue", lwd = 2)
+abline(a = 0, b = 1, lty = 2, col = "gray")
+legend("bottomright", paste("AUC =", round(auc_value, 4)))
+```
+
+### ROC Analysis and Model Discrimination
+
+**AUC: 0.7117**
+
+The Area Under the ROC Curve (AUC) of 0.7117 indicates good discriminative ability. The model performs significantly better than random classification (AUC = 0.5), demonstrating its effectiveness in distinguishing between default and non-default cases. However, there is room for improvement, as an AUC greater than 0.80 would indicate excellent discrimination.
+
+The ROC curve visualizes the trade-off between sensitivity (true positive rate) and specificity (1 - false positive rate) across different classification thresholds. The current threshold of 0.5 produces the high specificity and low sensitivity observed in the confusion matrix.
