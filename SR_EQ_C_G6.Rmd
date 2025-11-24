@@ -9,15 +9,11 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Introduction
+# Setup
 
-The "Default of Credit Card Clients in Taiwan" dataset contains information about credit card clients in Taiwan, including their demographic details, credit history, and payment behavior. The primary objective of this analysis is to build a logistic regression model to predict whether a client will default on their credit card payment next month based on the available features.
+## Load Libraries
 
-# features definition
-
-This research employed a binary variable, default payment (Yes = 1, No = 0), as the response variable. This study reviewed the literature and used the following 23 variables as explanatory variables: X1: Amount of the given credit (NT dollar): it includes both the individual consumer credit and his/her family (supplementary) credit. X2: Gender (1 = male; 2 = female). X3: Education (1 = graduate school; 2 = university; 3 = high school; 4 = others). X4: Marital status (1 = married; 2 = single; 3 = others). X5: Age (year). X6 - X11: History of past payment. We tracked the past monthly payment records (from April to September, 2005) as follows: X6 = the repayment status in September, 2005; X7 = the repayment status in August, 2005; . . .;X11 = the repayment status in April, 2005. The measurement scale for the repayment status is: -1 = pay duly; 1 = payment delay for one month; 2 = payment delay for two months; . . .; 8 = payment delay for eight months; 9 = payment delay for nine months and above. X12-X17: Amount of bill statement (NT dollar). X12 = amount of bill statement in September, 2005; X13 = amount of bill statement in August, 2005; . . .; X17 = amount of bill statement in April, 2005. X18-X23: Amount of previous payment (NT dollar). X18 = amount paid in September, 2005; X19 = amount paid in August, 2005; . . .;X23 = amount paid in April, 2005.
-
-# Load Necessary Libraries
+Load required packages for data manipulation, reading Excel files, and correlation visualization.
 
 ```{r load-libraries}
 library(tidyverse)
@@ -25,50 +21,141 @@ library(readxl)
 library(corrplot)
 ```
 
-# Load the Dataset
+## Load Data
+
+Load the credit card default dataset from Excel file, skipping the first row (header info).
 
 ```{r load-data}
-df <- read_excel("datasets/default of credit card clients.xls", # nolint
-                    skip = 1) # nolint
-
+df <- read_excel("datasets/default of credit card clients.xls", skip = 1)
 df |> glimpse()
-df |> head()
 ```
 
-Since the ID column is the row number for the dataset, hence it is not required for this analysis.
+## Data Cleaning
 
-```{r remove-id-col}
+Remove the ID column as it is not a predictive feature.
+
+```{r clean-data}
 df <- df |> select(-ID)
-
 df |> head()
 ```
 
-# Data Summary
+## Summary Statistics
+
+Display descriptive statistics for all variables in the dataset.
 
 ```{r data-summary}
 summary(df)
 ```
 
-## Check for Missing Values
+## Check Missing Values
+
+Verify that there are no missing values in the dataset.
 
 ```{r check-missing}
 colSums(is.na(df))
 ```
 
-Looking at the missing values summary above, we can easily tell that there are no missing values in the dataset.
+# Exploratory Data Analysis
 
-# Exploratory Data Analysis (EDA)
+## Target Variable Distribution
 
-Distribution of the target variable
+Visualize the distribution of default payment status to assess class balance.
 
-```{r eda}
-df |> ggplot(aes(x = default.payment.next.month)) +
+```{r target-dist}
+df |> ggplot(aes(x = factor(`default payment next month`))) +
   geom_bar(fill = "steelblue") +
-  labs(title = "Distribution of Default Payment Next Month",
-       x = "Default Payment Next Month",
-       y = "Count")
+  labs(title = "Distribution of Default Payment",
+       x = "Default (0 = No, 1 = Yes)",
+       y = "Count") +
+  theme_minimal()
 ```
 
-Correlation between numerical features
-```{r correlation-plot}
-library(corrplot)
+## Correlation Analysis
+
+Calculate Pearson correlations between all features and the target variable. Extract and sort the top 15 features by absolute correlation strength.
+
+```{r correlation-matrix}
+corr_matrix <- cor(df)
+
+target_col <- "default payment next month"
+target_corr <- corr_matrix[, target_col]
+target_corr_sorted <- sort(abs(target_corr), decreasing = TRUE)
+
+corr_df <- data.frame(
+  Variable = names(target_corr_sorted),
+  Correlation = target_corr[names(target_corr_sorted)]
+) |>
+  filter(Variable != target_col)
+
+head(corr_df, 15)
+```
+
+## Correlation Bar Plot
+
+Visualize the top 15 correlations with the target variable using a horizontal bar plot. Red bars indicate positive correlation (increases default risk), blue bars indicate negative correlation (reduces default risk).
+
+```{r corr-barplot, fig.width=10, fig.height=6}
+corr_df |>
+  head(15) |>
+  ggplot(aes(x = reorder(Variable, abs(Correlation)), 
+             y = Correlation,
+             fill = ifelse(Correlation > 0, "Positive", "Negative"))) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(title = "Top 15 Features Correlated with Default Payment",
+       x = "Features",
+       y = "Correlation Coefficient",
+       fill = "Correlation Type") +
+  scale_fill_manual(values = c("Positive" = "#e74c3c", "Negative" = "#3498db")) +
+  theme_minimal() +
+  theme(axis.text = element_text(size = 10),
+        plot.title = element_text(size = 12, face = "bold"))
+```
+
+## Outlier Detection
+
+Detect outliers using the Interquartile Range (IQR) method. Display the count of outliers for each numerical variable.
+
+```{r outlier-detection}
+# Function to detect outliers using IQR method
+detect_outliers <- function(x) {
+  Q1 <- quantile(x, 0.25, na.rm = TRUE)
+  Q3 <- quantile(x, 0.75, na.rm = TRUE)
+  IQR <- Q3 - Q1
+  lower_bound <- Q1 - 1.5 * IQR
+  upper_bound <- Q3 + 1.5 * IQR
+  sum(x < lower_bound | x > upper_bound, na.rm = TRUE)
+}
+
+# Count outliers for each numerical variable
+outlier_counts <- sapply(df, detect_outliers)
+outlier_summary <- data.frame(
+  Variable = names(outlier_counts),
+  Outlier_Count = outlier_counts
+) |>
+  filter(Outlier_Count > 0) |>
+  arrange(desc(Outlier_Count))
+
+print(outlier_summary)
+```
+
+## Outlier Visualization
+
+Create boxplots for the top features to visualize outliers.
+
+```{r outlier-boxplots, fig.width=12, fig.height=8}
+top_features <- corr_df$Variable[1:6]
+
+df |>
+  select(all_of(top_features)) |>
+  pivot_longer(everything(), names_to = "Variable", values_to = "Value") |>
+  ggplot(aes(x = Variable, y = Value)) +
+  geom_boxplot(fill = "lightblue", outlier.color = "red", outlier.size = 2) +
+  facet_wrap(~Variable, scales = "free") +
+  labs(title = "Boxplots of Top 6 Features - Outlier Detection",
+       x = "Features",
+       y = "Values") +
+  theme_minimal() +
+  theme(axis.text.x = element_blank(),
+        plot.title = element_text(size = 12, face = "bold"))
+```
