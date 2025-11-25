@@ -74,50 +74,122 @@ df |> ggplot(aes(x = factor(`default payment next month`))) +
   theme_minimal()
 ```
 
-## Correlation Analysis
+## Exploring Relationships with Default
 
-Calculate Pearson correlations between all features and the target variable. Extract and sort the top 15 features by absolute correlation strength.
+Let's look at a few key variables to see how they differ between customers who defaulted and those who didn't. This gives us a feel for which factors matter before we build the model.
 
-```{r correlation-matrix}
-corr_matrix <- cor(df)
+```{r explore-default, fig.width=12, fig.height=8}
+# Create a few exploratory plots
+par(mfrow = c(2, 3))
 
-target_col <- "default payment next month"
-target_corr <- corr_matrix[, target_col]
-target_corr_sorted <- sort(abs(target_corr), decreasing = TRUE)
+# 1. Payment Status (PAY_0) vs Default
+df_plot <- df %>%
+  mutate(`default payment next month` = factor(`default payment next month`, labels = c("No Default", "Default"))) %>%
+  group_by(PAY_0, `default payment next month`) %>%
+  summarise(Count = n(), .groups = "drop")
 
-corr_df <- data.frame(
-  Variable = names(target_corr_sorted),
-  Correlation = target_corr[names(target_corr_sorted)]
-) |>
-  filter(Variable != target_col)
+plot_pay0 <- ggplot(df_plot, aes(x = factor(PAY_0), y = Count, fill = `default payment next month`)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.7) +
+  labs(title = "Payment Status vs Default",
+       x = "Payment Status (Month 0)",
+       y = "Number of Customers",
+       fill = "Outcome") +
+  scale_fill_manual(values = c("No Default" = "#27ae60", "Default" = "#e74c3c")) +
+  theme_minimal() + theme(axis.text.x = element_text(angle = 45))
 
-head(corr_df, 15) |>
-  rownames_to_column("Index") |>
-  mutate(Index = as.numeric(Index)) |>
-  `rownames<-`(NULL)
-```
-
-## Correlation Bar Plot
-
-Visualize the top 15 correlations with the target variable using a horizontal bar plot. Red bars indicate positive correlation (increases default risk), blue bars indicate negative correlation (reduces default risk).
-
-```{r corr-barplot, fig.width=8, fig.height=5}
-corr_df |>
-  head(15) |>
-  ggplot(aes(x = reorder(Variable, abs(Correlation)), 
-             y = Correlation,
-             fill = ifelse(Correlation > 0, "Positive", "Negative"))) +
-  geom_bar(stat = "identity", width = 0.6) +
-  coord_flip() +
-  labs(title = "Top 15 Features Correlated with Default Payment",
-       x = "Features",
-       y = "Correlation Coefficient",
-       fill = "Correlation Type") +
-  scale_fill_manual(values = c("Positive" = "#3498db", "Negative" = "#e74c3c")) + #nolint
+# 2. Age vs Default (box plot)
+plot_age <- ggplot(df %>% mutate(`default payment next month` = factor(`default payment next month`, labels = c("No Default", "Default"))), 
+                   aes(x = `default payment next month`, y = AGE, fill = `default payment next month`)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(title = "Age Distribution by Default Status",
+       x = "Outcome",
+       y = "Age",
+       fill = "Outcome") +
+  scale_fill_manual(values = c("No Default" = "#27ae60", "Default" = "#e74c3c")) +
   theme_minimal() +
-  theme(axis.text = element_text(size = 10),
-        plot.title = element_text(size = 12, face = "bold"))
+  theme(legend.position = "none")
+
+# 3. Credit Limit vs Default
+plot_limit <- ggplot(df %>% mutate(`default payment next month` = factor(`default payment next month`, labels = c("No Default", "Default"))), 
+                     aes(x = `default payment next month`, y = LIMIT_BAL, fill = `default payment next month`)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(title = "Credit Limit by Default Status",
+       x = "Outcome",
+       y = "Credit Limit",
+       fill = "Outcome") +
+  scale_fill_manual(values = c("No Default" = "#27ae60", "Default" = "#e74c3c")) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# 4. Payment Amount vs Default
+plot_payamt <- ggplot(df %>% mutate(`default payment next month` = factor(`default payment next month`, labels = c("No Default", "Default"))) %>%
+                       filter(PAY_AMT1 < 100000), # Remove extreme outliers for better visualization
+                     aes(x = `default payment next month`, y = PAY_AMT1, fill = `default payment next month`)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(title = "Payment Amount (PAY_AMT1) by Default Status",
+       x = "Outcome",
+       y = "Payment Amount (Month 1)",
+       fill = "Outcome") +
+  scale_fill_manual(values = c("No Default" = "#27ae60", "Default" = "#e74c3c")) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# 5. Education vs Default
+df_edu <- df %>%
+  mutate(`default payment next month` = factor(`default payment next month`, labels = c("No Default", "Default")),
+         EDUCATION = factor(EDUCATION, levels = c(0, 1, 2, 3, 4, 5, 6), 
+                           labels = c("Unknown", "Graduate", "University", "High School", "Other", "Unknown2", "Unknown3"))) %>%
+  group_by(EDUCATION, `default payment next month`) %>%
+  summarise(Count = n(), .groups = "drop")
+
+plot_edu <- ggplot(df_edu, aes(x = EDUCATION, y = Count, fill = `default payment next month`)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.7) +
+  labs(title = "Education Level vs Default",
+       x = "Education Level",
+       y = "Number of Customers",
+       fill = "Outcome") +
+  scale_fill_manual(values = c("No Default" = "#27ae60", "Default" = "#e74c3c")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# 6. Marriage Status vs Default
+df_marr <- df %>%
+  mutate(`default payment next month` = factor(`default payment next month`, labels = c("No Default", "Default")),
+         MARRIAGE = factor(MARRIAGE, levels = c(0, 1, 2, 3), 
+                          labels = c("Unknown", "Married", "Single", "Divorced"))) %>%
+  group_by(MARRIAGE, `default payment next month`) %>%
+  summarise(Count = n(), .groups = "drop")
+
+plot_marr <- ggplot(df_marr, aes(x = MARRIAGE, y = Count, fill = `default payment next month`)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.7) +
+  labs(title = "Marriage Status vs Default",
+       x = "Marriage Status",
+       y = "Number of Customers",
+       fill = "Outcome") +
+  scale_fill_manual(values = c("No Default" = "#27ae60", "Default" = "#e74c3c")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Combine plots
+library(gridExtra)
+grid.arrange(plot_pay0, plot_age, plot_limit, plot_payamt, plot_edu, plot_marr, ncol = 3)
 ```
+
+### What We Notice
+
+Looking at these plots, some patterns jump out:
+
+-   **Payment Status (PAY_0)**: Customers with recent payment delays (values like 1, 2, 3 meaning "revolving credit," "pay duly," etc.) clearly show different default rates. People with payment problems default much more often.
+
+-   **Age**: Older customers might have different default patterns. The boxes show the spread of ages for each group.
+
+-   **Credit Limit**: Customers with higher credit limits seem to have different default rates. Banks probably gave higher limits to safer customers.
+
+-   **Payment Amounts**: Customers who make bigger payments are less likely to default, which makes sense - if you're paying off your debt, you won't default.
+
+-   **Education & Marriage**: These demographic factors might also play a role, though the patterns are less dramatic.
+
+This exploration helps us see **why** certain features will be important in our model later on.
 
 # Feature Selection and Modeling
 
@@ -252,26 +324,36 @@ cat("Total Features Selected:", length(coef(step_model)) - 1, "\n")
 
 ## Analysis of Feature Selection Results
 
-Our forward stepwise selection process identifies 18 optimal features that collectively minimize the AIC while maintaining model interpretability. The analysis reveals several key insights:
+Using forward selection, we identified 18 out of 23 features as the most important for predicting credit card defaults. This means we dropped 5 less-important features without losing much predictive power, which actually makes our model simpler and easier to explain.
 
-**Initial Model Performance:** Starting with PAY_0 alone, our baseline model achieves an AIC of 28,535.57. This validates that recent repayment status is the strongest individual predictor of credit card default.
+**Where We Started:** When we began with just PAY_0 (the most recent payment status), the model had an AIC of 28,535.57. This shows right away that how someone paid recently is the biggest clue about whether they'll default.
 
-**Feature Addition Pattern:** The feature progression table demonstrates that each additional feature provides meaningful AIC reduction, particularly in the early stages: - Features 2-5 (LIMIT_BAL, PAY_3, PAY_AMT1, BILL_AMT1) yield substantial improvements of 92-199 AIC points each - Features 6-12 (MARRIAGE through SEX) provide moderate improvements of 10-39 AIC points - Features 13-18 show diminishing returns with reductions of 0.5-7.8 AIC points, but remain beneficial for model fit
+**How Features Were Added:** Looking at our results, we can see that the first few features we added made huge differences: - The first 4 extra features (LIMIT_BAL, PAY_3, PAY_AMT1, BILL_AMT1) each saved about 92-199 AIC points - The next batch (6-12 features) helped less, saving about 10-39 AIC points each - After that, each new feature only helped a tiny bit (0.5-7.8 AIC points), but we kept them because they still improved the model
 
-**Total Improvement:** The cumulative AIC improvement from 28,535.57 to 27,917.81 represents a reduction of 617.76 points, indicating that the selected 18-feature model provides substantially better model fit than the baseline single-feature model while maintaining parsimony relative to the full 23-feature model.
+**Total Improvement:** We went from an AIC of 28,535.57 down to 27,917.81---that's a drop of 617.76 points! This shows our 18-feature model fits the data way better than just using one feature, but we're not overcomplicating it with all 23 features.
 
-**Feature Composition:** The selected features encompass multiple dimensions of creditworthiness: recent repayment status (PAY_0 through PAY_6), payment amounts (PAY_AMT1-6), bill amounts (BILL_AMT1-3), demographic characteristics (MARRIAGE, SEX, EDUCATION, AGE), and available credit (LIMIT_BAL). This diversity suggests that default prediction benefits from both behavioral and demographic information.
+**What Types of Features Made the Cut:** We ended up with a good mix: - Payment history from different months (PAY_0 through PAY_5) - Payment amounts and bill amounts - Personal info like marital status, gender, education, and age - Credit limit information
+
+This makes sense because defaults aren't just about one thing---they depend on recent behavior, how much someone owes, and personal circumstances.
 
 ## Feature Importance and Coefficients
 
-Coefficients and p-values for the selected model.
+Coefficients, 95% confidence intervals, odds ratios, and p-values for the selected model.
 
 ```{r feature-importance}
+# Extract coefficients and confidence intervals
+coef_summary <- coef(step_model)
+ci_matrix <- confint(step_model, level = 0.95)
+
 model_coef <- data.frame(
-  Feature = names(coef(step_model)),
-  Coefficient = coef(step_model)
+  Feature = names(coef_summary),
+  Coefficient = coef_summary,
+  CI_Lower = ci_matrix[, 1],
+  CI_Upper = ci_matrix[, 2]
 ) |>
-  mutate(Coefficient = round(Coefficient, 6))
+  mutate(Coefficient = round(Coefficient, 6),
+         CI_Lower = round(CI_Lower, 6),
+         CI_Upper = round(CI_Upper, 6))
 
 p_values <- summary(step_model)$coefficients[, "Pr(>|z|)"]
 model_coef$P_Value <- p_values[match(model_coef$Feature, names(p_values))]
@@ -279,22 +361,66 @@ model_coef$Significance <- ifelse(model_coef$P_Value < 0.001, "***",
                                    ifelse(model_coef$P_Value < 0.01, "**",
                                           ifelse(model_coef$P_Value < 0.05, "*", "")))
 
+# Add odds ratios and their confidence intervals
+odds_ratios <- exp(coef_summary)
+odds_ci <- exp(ci_matrix)
+
+model_coef$Odds_Ratio <- round(odds_ratios[match(model_coef$Feature, names(odds_ratios))], 4)
+model_coef$OR_CI_Lower <- round(odds_ci[match(model_coef$Feature, rownames(odds_ci)), 1], 4)
+model_coef$OR_CI_Upper <- round(odds_ci[match(model_coef$Feature, rownames(odds_ci)), 2], 4)
+
 print(model_coef)
 ```
 
-## Coefficient Analysis and Interpretation
+## Coefficient and Odds Ratio Analysis and Interpretation
 
-Our logistic regression model reveals that repayment status and payment behavior are the most critical determinants of default risk:
+Looking at our model, the biggest story is that **payment history is everything**. How someone has been paying, especially recently, is by far the strongest predictor of whether they'll default:
 
-**Strongest Risk Factors (Increase Default Probability):** - **PAY_0 (coefficient: 0.579, p \< 0.001)**: The most dominant predictor. Recent payment status strongly increases default odds, with each unit increase in repayment delay status substantially raising default probability. - **PAY_2 and PAY_3 (coefficients: 0.083 and 0.082, p \< 0.001)**: Two-month and three-month repayment status similarly contribute to default risk, indicating that payment delay patterns persist and compound risk. - **PAY_5 (coefficient: 0.056, p \< 0.01)**: Five-month status also shows positive effect on default risk. - **AGE (coefficient: 0.007, p \< 0.001)**: Older customers have marginally higher default risk.
+**The Biggest Risk Factors (Make Default More Likely):**
 
-**Strongest Protective Factors (Decrease Default Probability):** - **MARRIAGE (coefficient: -0.155, p \< 0.001)**: Married individuals show substantially lower default risk compared to unmarried individuals. - **SEX (coefficient: -0.108, p \< 0.001)**: Female customers have lower default risk than male customers. - **EDUCATION (coefficient: -0.102, p \< 0.001)**: Higher education level provides protective effect against default. - **Available Credit (LIMIT_BAL, coefficient: -0.000001, p \< 0.001)**: Higher credit limits correlate with lower default risk, suggesting creditworthy customers receive higher limits. - **Payment Amounts (PAY_AMT1-6, all negative coefficients)**: Greater payment amounts strongly reduce default risk, indicating that customers making larger payments are less likely to default.
+-   **PAY_0 (coefficient: 0.577)** - This is the powerhouse. PAY_0 measures recent payment status, and it's the single strongest predictor. The confidence interval is [0.536, 0.619], which is tight and doesn't include zero, meaning we're really confident this matters. Basically, if someone has had recent payment delays, their default risk shoots up.
 
-**Statistical Significance:** Most features are highly significant at p \< 0.001, demonstrating the robustness of their predictive contributions. A few features (BILL_AMT2, PAY_AMT3, PAY_AMT6) show marginal or non-significant p-values (p \> 0.05), suggesting limited unique predictive value when combined with other features, though they were selected by the forward procedure for their marginal AIC improvements.
+-   **PAY_2 and PAY_3 (coefficients: 0.107 and 0.068)** - These measure payment status from 2 and 3 months ago. Interestingly, they're still important even though they're older data, which suggests that if someone has a pattern of paying late, it keeps affecting their risk.
 
-## Feature Importance Visualization
+-   **PAY_5 (positive but smaller coefficient)** - Payment status from 5 months ago still matters, but the effect gets weaker as we go back in time.
 
-Visualize the magnitude and direction of coefficient effects to identify the strongest risk and protective factors.
+**The Protective Factors (Make Default Less Likely):**
+
+-   **MARRIAGE (coefficient: -0.156, CI: [-0.230, -0.082])** - Married people have a lower default risk. The negative coefficient means each unit increase in the marriage variable (probably coded as 1 for married, 2 for single) is associated with lower default probability.
+
+-   **EDUCATION (coefficient: -0.105, CI: [-0.154, -0.056])** - More educated customers default less. This could reflect higher income stability or better financial management.
+
+-   **SEX (coefficient: -0.104, CI: [-0.176, -0.032])** - Based on typical coding, one gender has lower default risk than the other.
+
+-   **Payment Amounts (PAY_AMT1-6)** - Customers who make larger payments are much less likely to default. This makes intuitive sense---if you're paying off your card, you're not going to default.
+
+-   **LIMIT_BAL (very small negative coefficient)** - Higher credit limits are associated with lower default risk, probably because banks give bigger limits to safer customers.
+
+**Statistical Confidence:** Most coefficients have p-values less than 0.001 (shown as \*\*\* in the table), meaning we're very confident these effects are real. A few features like PAY_AMT3 and BILL_AMT2 don't quite hit the 0.05 significance level on their own, but they still made it into the model because they collectively improve the AIC, which is what forward selection optimizes for.
+
+### Understanding Odds Ratios (The Practical Impact)
+
+While coefficients tell us direction and statistical significance, **odds ratios** (shown in the table above) tell us the practical impact in a more intuitive way. Here's how to interpret them:
+
+-   **Odds Ratio = 1.00**: No effect on default risk
+-   **Odds Ratio \> 1.00**: Increases default risk (every unit increase multiplies odds by this amount)
+-   **Odds Ratio \< 1.00**: Decreases default risk (protective factor)
+
+**Practical Examples from Our Model (See Odds_Ratio column in table):**
+
+-   **PAY_0 (OR = 1.78, 95% CI: [1.71, 1.86])**: For each one-unit increase in recent payment delay status, the odds of default multiply by about 1.78---a **78% increase** in default odds. This is huge and it's our strongest predictor. The narrow confidence interval shows we're very confident this effect is real.
+
+-   **MARRIAGE (OR = 0.86, 95% CI: [0.79, 0.92])**: Being married multiplies the odds of default by 0.86, which means it **reduces** the odds by about 14%. Married people are notably lower risk.
+
+-   **EDUCATION (OR = 0.90, 95% CI: [0.86, 0.95])**: Higher education level multiplies odds by 0.90---a **10% reduction** in default odds. Education is a meaningful protective factor.
+
+-   **PAY_AMT1 (OR \~= 0.9999)**: The odds ratio is extremely close to 1 because payment amounts are in thousands. Each additional dollar has a tiny protective effect, but the aggregate effect of large payments is meaningful.
+
+Odds ratios make it much easier to communicate results: an odds ratio of 1.78 is "a big deal"---every step up in payment delay increases your default risk by 78%. An odds ratio of 0.90 is "meaningful but modest"---a real protective effect but not dramatic.
+
+## Feature Importance Visualization with Confidence Intervals
+
+Visualize the magnitude and direction of coefficient effects with 95% confidence intervals to indicate precision and robustness.
 
 ```{r coefficient-plot, fig.width=10, fig.height=8}
 # Prepare data for plotting (exclude intercept)
@@ -305,14 +431,15 @@ coef_plot_data <- model_coef |>
          Effect_Type = ifelse(Coefficient > 0, "Risk Factor", "Protective Factor"))
 
 ggplot(coef_plot_data, aes(x = Coefficient, y = Feature, fill = Effect_Type)) +
-  geom_col(width = 0.7) +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "black", linewidth = 0.8) +
+  geom_col(width = 0.6, alpha = 0.8) +
+  geom_errorbarh(aes(xmin = CI_Lower, xmax = CI_Upper), height = 0.3, color = "black", linewidth = 0.8) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", linewidth = 1) +
   scale_fill_manual(values = c("Risk Factor" = "#e74c3c", "Protective Factor" = "#27ae60")) +
-  labs(title = "Model Coefficients: Feature Importance",
+  labs(title = "Model Coefficients with 95% Confidence Intervals",
        x = "Coefficient Value",
        y = "Feature",
        fill = "Effect Type",
-       subtitle = "Red: Increases default risk | Green: Decreases default risk") +
+       subtitle = "Red: Increases default risk | Green: Decreases default risk | Error bars show 95% CI") +
   theme_minimal() +
   theme(plot.title = element_text(size = 14, face = "bold"),
         plot.subtitle = element_text(size = 11, color = "gray40"),
@@ -323,16 +450,21 @@ ggplot(coef_plot_data, aes(x = Coefficient, y = Feature, fill = Effect_Type)) +
 
 # Model Evaluation
 
-## Train-Test Split
+## Train-Test Split with Stratified Sampling
 
-Split dataset into 70% training and 30% testing sets for model evaluation.
+Given the class imbalance in our dataset (approximately 78% non-defaults and 22% defaults), we employ stratified sampling to ensure both the training and test sets maintain the same class distribution. This approach is crucial for imbalanced datasets because random splitting can result in disproportionate class representation, leading to biased model evaluation.
 
 ```{r train-test-split}
 set.seed(123)
-n <- nrow(df)
-train_idx <- sample(1:n, size = 0.7 * n)
+# Use stratified sampling to maintain class proportions
+train_idx <- createDataPartition(df$`default payment next month`, p = 0.7, list = FALSE)
 train_data <- df[train_idx, ]
 test_data <- df[-train_idx, ]
+
+cat("Dataset Class Distribution:\n")
+cat("Overall - Default: ", round(mean(df$`default payment next month` == 1) * 100, 2), "%\n", sep="")
+cat("Training Set - Default: ", round(mean(train_data$`default payment next month` == 1) * 100, 2), "%\n", sep="")
+cat("Test Set - Default: ", round(mean(test_data$`default payment next month` == 1) * 100, 2), "%\n\n", sep="")
 
 cat("Training set size:", nrow(train_data), "\n")
 cat("Test set size:", nrow(test_data), "\n")
@@ -384,25 +516,33 @@ Visualize the confusion matrix as a heatmap for better interpretation of classif
 
 ```{r confusion-matrix-heatmap, fig.width=8, fig.height=6}
 # Extract confusion matrix values
-cm_table <- cm$table
+cm_matrix <- cm$table
 
-# Convert to data frame for ggplot
-cm_data <- as.data.frame(cm_table)
-colnames(cm_data) <- c("Predicted", "Actual", "Count")
+# Properly convert matrix to long format preserving the 2D structure
+cm_long <- expand_grid(
+  Actual = as.numeric(colnames(cm_matrix)),
+  Prediction = as.numeric(rownames(cm_matrix))
+) %>%
+  mutate(
+    Count = c(cm_matrix),
+    Actual_Label = factor(Actual, labels = c("No Default (0)", "Default (1)")),
+    Prediction_Label = factor(Prediction, labels = c("No Default (0)", "Default (1)"))
+  )
 
-# Create heatmap
-ggplot(cm_data, aes(x = Actual, y = Predicted, fill = Count)) +
+# Create heatmap with correct orientation
+ggplot(cm_long, aes(x = Actual_Label, y = Prediction_Label, fill = Count)) +
   geom_tile(color = "black", linewidth = 1) +
-  geom_text(aes(label = Count), fontface = "bold", size = 5, color = "white") +
+  geom_text(aes(label = Count), fontface = "bold", size = 6, color = "white") +
   scale_fill_gradient(low = "#fee5d9", high = "#a50f15") +
+  scale_y_discrete(limits = rev(levels(cm_long$Prediction_Label))) +
   labs(title = "Confusion Matrix Heatmap",
-       x = "Actual Class (0 = No Default, 1 = Default)",
-       y = "Predicted Class (0 = No Default, 1 = Default)",
+       x = "Actual Class",
+       y = "Predicted Class",
        fill = "Count",
-       subtitle = "True Negatives (top-left) and True Positives (bottom-right) indicate correct predictions") +
+       subtitle = "Correct predictions on diagonal (TN top-left=6815, TP bottom-right=492)") +
   theme_minimal() +
   theme(plot.title = element_text(size = 14, face = "bold"),
-        plot.subtitle = element_text(size = 11, color = "gray40"),
+        plot.subtitle = element_text(size = 10, color = "gray40"),
         axis.text = element_text(size = 11),
         panel.grid = element_blank())
 ```
@@ -420,17 +560,24 @@ sensitivity <- metrics["Sensitivity"]
 specificity <- metrics["Specificity"]
 precision <- metrics["Pos Pred Value"]
 balanced_acc <- metrics["Balanced Accuracy"]
+
+# Calculate AUC for display
+roc_obj <- roc(actual, pred_prob)
+auc_value <- auc(roc_obj)
 ```
 
-## Performance Metrics
+## Performance Metrics with Confidence Intervals
 
 ```{r display-metrics}
-cat("Performance Metrics:\n")
-cat("Accuracy:         ", round(accuracy, 4), "\n")
-cat("Sensitivity:      ", round(sensitivity, 4), "\n")
-cat("Specificity:      ", round(specificity, 4), "\n")
-cat("Precision:        ", round(precision, 4), "\n")
-cat("Balanced Accuracy:", round(balanced_acc, 4), "\n")
+cat("Performance Metrics with 95% Confidence Intervals:\n\n")
+cat("Accuracy:              ", round(overall_metrics["Accuracy"], 4), "\n")
+cat("95% CI:                [", round(overall_metrics["AccuracyLower"], 4), ", ", 
+    round(overall_metrics["AccuracyUpper"], 4), "]\n\n", sep="")
+cat("Sensitivity (Recall):  ", round(metrics["Sensitivity"], 4), "\n")
+cat("Specificity:           ", round(metrics["Specificity"], 4), "\n")
+cat("Precision:             ", round(metrics["Pos Pred Value"], 4), "\n")
+cat("Balanced Accuracy:     ", round(metrics["Balanced Accuracy"], 4), "\n")
+cat("AUC:                   ", round(auc_value, 4), "\n")
 ```
 
 ## Metric Definitions
@@ -447,40 +594,55 @@ cat("Balanced Accuracy:", round(balanced_acc, 4), "\n")
 
 | Metric            | Value  | Interpretation                                         |
 |-------------------|--------|--------------------------------------------------------|
-| Accuracy          | 81.34% | Overall correct predictions across both classes        |
-| Sensitivity       | 25.09% | Proportion of actual defaults correctly identified     |
-| Specificity       | 96.98% | Proportion of actual non-defaults correctly identified |
-| Precision         | 69.74% | Of predicted defaults, how many are actually correct   |
-| Balanced Accuracy | 61.03% | Average performance accounting for class imbalance     |
+| Accuracy          | 81.20% | Overall correct predictions across both classes        |
+| Sensitivity       | 24.72% | Proportion of actual defaults correctly identified     |
+| Specificity       | 97.23% | Proportion of actual non-defaults correctly identified |
+| Precision         | 71.72% | Of predicted defaults, how many are actually correct   |
+| Balanced Accuracy | 60.98% | Average performance accounting for class imbalance     |
+| AUC               | 0.7250 | Discrimination ability between default and non-default |
 
 ### Detailed Performance Analysis
 
-**Accuracy (81.34%): Overall Correctness** - The model correctly classifies 81.34% of all cases (both defaults and non-defaults) - 95% confidence interval: [80.52%, 82.14%] indicates a reliable estimate
+**Accuracy (81.20% with 95% CI: [80.38%, 82.00%])** - Our model correctly predicts whether a customer will default or not 81.20% of the time. This means that out of every 100 customers in the test set, the model makes correct predictions for about 81 of them. The narrow confidence interval shows that this result is fairly reliable and wouldn't change much if we tested on different data.
 
-**Sensitivity (25.09%): Default Detection Rate** - Of 1,957 actual defaults in the test set, the model identifies only 491 (25.09%) - The model misses 1,466 actual defaults (false negatives) - This low sensitivity indicates the model is conservative in flagging defaults
+**Sensitivity (24.72%): Default Detection Rate** - This is actually one of the challenging aspects of our model. The model only catches about 24.72% of customers who actually default. In practical terms, if there are 100 customers who will truly default, our model would identify only about 25 of them. This means we miss 75% of the actual defaults (false negatives). This low sensitivity happens because our model is being conservative---it's trying hard not to falsely alarm customers who won't default.
 
-**Specificity (96.98%): Non-Default Identification** - Of 7,043 actual non-defaults, the model correctly identifies 6,830 (96.98%) - Only 213 false positives (non-defaults incorrectly flagged as defaults) - The model excels at identifying genuine non-defaulters and avoiding unnecessary interventions
+**Specificity (97.23%): Non-Default Identification** - On the flip side, our model is very good at identifying customers who will NOT default. It correctly identifies 97.23% of non-defaulters. This is actually a strength because it means we rarely bother customers who are good payers with unnecessary interventions or warnings.
 
-**Precision (69.74%): Prediction Reliability** - Of 704 cases predicted as defaults, 491 are actually defaults - When the model predicts a default, it is correct approximately 70% of the time - This precision level is acceptable for risk management applications
+**Precision (71.72%): Prediction Reliability** - When our model predicts that someone will default, it's correct about 71.72% of the time. This means if we act on the model's default predictions, we can be fairly confident that most of those customers are actually at risk.
 
-**Balanced Accuracy (61.03%): Class-Imbalance Adjusted Performance** - Average of sensitivity (25.09%) and specificity (96.98%) - Accounts for class imbalance where only 21.7% of the population are actual defaults - Demonstrates balanced performance across both classes
+**Balanced Accuracy (60.98%)** - Since our dataset is imbalanced (22% defaults, 78% non-defaults), we use balanced accuracy to get a fair picture. This gives equal weight to sensitivity and specificity, showing that on average, our model performs moderately well on both classes.
+
+**AUC (0.7250): Model Discrimination Ability** - This tells us how well our model can distinguish between defaulters and non-defaulters at different probability thresholds. A score of 0.72 is reasonably good (better than 0.50 which is random), though there's definitely room for improvement toward 0.80 or higher.
+
+### Why These Trade-offs Matter
+
+The results show an interesting pattern: our model is very conservative. It's excellent at protecting non-defaulters from false alarms (97% specificity) but misses many actual defaults (only 25% sensitivity). This happens because:
+
+1.  The dataset is heavily imbalanced (78% non-defaulters vs. 22% defaulters)
+2.  Our model learned to be cautious about predicting defaults
+3.  The 0.5 probability threshold is somewhat arbitrary
+
+In a real business setting, this means our model might be used to identify the highest-confidence default cases for special monitoring, rather than trying to catch every single defaulter.
 
 ### Business Implications
 
--   **Model Conservatism**: The model rarely predicts defaults due to severe class imbalance (\~22% defaults in the dataset)
--   **High Specificity Benefit**: A 96.98% specificity minimizes false alarms to customers, avoiding unnecessary interventions
--   **Low Sensitivity Trade-off**: A 25.09% sensitivity means the model misses 3 of 4 actual defaults
--   **Use Case Fit**: This model is better suited for avoiding customer inconvenience than for catching all potential defaults
+-   Our model is particularly useful for **minimizing false alarms**: we can be fairly confident when it predicts a default
+
+-   However, we shouldn't rely on it alone to identify all at-risk customers; we might need additional screening methods
+
+-   The model works best for customers in the "obvious" risk categories (recent payment delays, high age, low education)
+
+-   It might miss some default cases that don't fit the typical pattern
+
 -   **Potential Improvements**: Classification threshold adjustment or class weighting techniques could improve sensitivity at the cost of specificity
 
 ## ROC Curve and AUC
 
-Generate ROC curve and calculate AUC to evaluate model discrimination ability.
+Generate ROC curve to visualize model discrimination ability.
 
 ```{r roc-curve, fig.width=8, fig.height=6}
-roc_obj <- roc(actual, pred_prob)
-auc_value <- auc(roc_obj)
-
+# Plot ROC curve (auc_value was already calculated in extract-metrics chunk)
 plot(roc_obj, main = "ROC Curve", col = "steelblue", lwd = 2)
 abline(a = 0, b = 1, lty = 2, col = "gray")
 legend("bottomright", paste("AUC =", round(auc_value, 4)))
@@ -488,18 +650,20 @@ legend("bottomright", paste("AUC =", round(auc_value, 4)))
 
 ### ROC Analysis and Model Discrimination
 
-**AUC: 0.7117**
+**AUC: 0.7250**
 
-The Area Under the ROC Curve (AUC) of 0.7117 indicates good discriminative ability. The model demonstrates its effectiveness in distinguishing between default and non-default cases, performing substantially better than random classification (AUC = 0.5). While there remains room for improvement toward excellent discrimination (AUC \> 0.80), the current performance reflects a reasonable trade-off given the inherent class imbalance in credit default prediction.
+The AUC (Area Under the Curve) of 0.7250 tells us how well our model can tell the difference between people who will default and people who won't. To understand this score: a perfect model would have an AUC of 1.0, a completely useless model would be 0.5 (basically random guessing), and our score of 0.72 is pretty good---it's much better than random.
 
-The ROC curve visualizes the relationship between sensitivity (true positive rate) and specificity (1 - false positive rate) across different classification thresholds. At the standard threshold of 0.5, the model achieves the high specificity (96.98%) and low sensitivity (25.09%) observed in the confusion matrix, reflecting its conservative approach to default prediction.
+The ROC curve (the curvy line in the graph) shows us what happens when we change our decision threshold. Right now we're using 0.5 (if the model predicts a probability above 0.5, we say it's a default). But we could adjust this depending on what we need---if we want to catch more defaults, we could lower the threshold; if we want fewer false alarms, we could raise it. The curve shows all the different trade-offs available to us.
 
 ## Overall Model Assessment and Conclusions
 
-Our logistic regression model for credit card default prediction demonstrates solid performance across multiple evaluation metrics:
+Overall, we built a logistic regression model that does a decent job predicting credit card defaults, though like most real-world models, it has both strengths and limitations.
 
-**Model Strengths:** - Achieves 81.34% overall accuracy on the test set - Exhibits exceptional specificity (96.98%), effectively minimizing false alarms to non-defaulting customers - Maintains reasonable precision (69.74%), ensuring that most predicted defaults warrant genuine concern - Provides interpretable coefficients that align with domain knowledge (recent payment delays increase default risk, while certain demographic factors provide protective effects)
+**What Our Model Does Well:** - It gets predictions right about 81% of the time overall - It's really good at not bothering good customers (97% specificity)---if someone won't default, we usually recognize that - When it does predict a default, it's usually right (72% precision) - The factors it found make intuitive sense (recent payment problems = higher risk, married = lower risk, etc.)
 
-**Model Limitations:** - Low sensitivity (25.09%) results in missing approximately 75% of actual defaults - This conservative nature reflects the severe class imbalance (approximately 78% non-defaulters, 22% defaulters) in the dataset - The AUC of 0.7117 suggests moderate discriminative power
+**Where It Falls Short:** - It misses a lot of actual defaults (only catches 25%)---out of 100 people who will actually default, we'd identify only about 25 of them - This happens because the dataset heavily favors non-defaulters, and the model learns to be very cautious - It's not great at distinguishing risk levels overall (AUC of 0.72 is decent but not excellent)
 
-**Practical Implications:** This model is most suitable for scenarios where avoiding false alarms (unnecessary customer interventions) is prioritized over detecting every potential default. Financial institutions using this model should consider supplementary risk assessment methods to catch high-risk accounts that the model may overlook, or employ threshold optimization to increase sensitivity for strategic accounts requiring heightened monitoring.
+**What This Means in Practice:** This model is good if your bank wants to avoid bothering customers who are fine, but it won't catch all the risky ones. You probably wouldn't want to rely on it alone to decide who can get a credit card. Instead, you'd use it as one tool in a bigger risk management system---maybe it flags some cases for manual review, or you use it together with other assessment methods. If you really needed to catch more defaults, you could adjust the decision threshold, but then you'd get more false alarms.
+
+In conclusion, this model shows that recent payment behavior is the key to predicting defaults, which makes intuitive sense. With the right business strategy about how to use these predictions, it could be genuinely useful for a bank.
