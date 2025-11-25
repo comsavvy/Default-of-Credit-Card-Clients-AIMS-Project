@@ -91,7 +91,10 @@ corr_df <- data.frame(
 ) |>
   filter(Variable != target_col)
 
-head(corr_df, 15)
+head(corr_df, 15) |>
+  rownames_to_column("Index") |>
+  mutate(Index = as.numeric(Index)) |>
+  `rownames<-`(NULL)
 ```
 
 ## Correlation Bar Plot
@@ -131,9 +134,9 @@ df$`default payment next month` <- factor(df$`default payment next month`, level
 Build logistic regression model with all features.
 
 ```{r full-model, warning=FALSE, cache=TRUE}
-full_model <- glm(`default payment next month` ~ ., 
-                   data = df, 
-                   family = binomial(link = "logit"))
+full_model <- glm(`default payment next month` ~ .,
+                  data = df,
+                  family = binomial(link = "logit"))
 
 summary(full_model)
 ```
@@ -165,27 +168,99 @@ print(feature_aic)
 
 PAY_0 (most recent repayment status) is the strongest individual predictor with lowest AIC of 28535.57. PAY_2 and PAY_3 follow as secondary predictors. Bill amounts and age have higher AIC values, indicating weaker individual predictive power.
 
-## Stepwise Feature Selection using AIC
+## Forward Stepwise Feature Selection using AIC
 
-Use stepwise selection to identify important features based on AIC.
+We employ forward stepwise selection starting with the strongest individual predictor (PAY_0) and progressively add features that provide the greatest AIC reduction. This approach reveals the optimal feature combinations and demonstrates how model performance improves as we incorporate additional predictors.
 
-```{r stepwise-selection, warning=FALSE, cache=TRUE}
-step_model <- step(full_model, direction = "both", trace = 0)
+```{r forward-selection, warning=FALSE, cache=TRUE}
+# Start with the best individual feature (PAY_0)
+initial_model <- glm(`default payment next month` ~ PAY_0, data = df, family = binomial(link = "logit"))
+
+# Run forward selection from the initial model with trace to show AIC progression
+step_model <- step(initial_model, scope = list(upper = full_model), direction = "forward", trace = 1)
 
 summary(step_model)
 ```
 
-## Model Comparison
+## Feature Combination and AIC Progression
 
-Compare AIC values for full model and stepwise selected model.
+The table below summarizes the AIC values at each step of the forward selection process, showing how the model improves as features are added sequentially.
 
-```{r model-comparison}
-cat("Full Model AIC:", AIC(full_model), "\n")
-cat("Stepwise Model AIC:", AIC(step_model), "\n")
-cat("Difference:", AIC(full_model) - AIC(step_model), "\n")
+```{r feature-combination-table, warning=FALSE}
+# Extract selected features from step_model
+selected_features <- names(coef(step_model))[-1]  # Exclude intercept
+
+# Create a table showing feature combination progression
+feature_progression <- data.frame(
+  Step = seq_along(selected_features),
+  Feature_Added = selected_features,
+  Cumulative_Features = sapply(seq_along(selected_features), function(i) 
+    paste(selected_features[1:i], collapse = " + "))
+)
+
+# Calculate AIC for each step's model
+aics <- numeric(length(selected_features))
+aics[1] <- AIC(initial_model)
+
+for(i in 2:length(selected_features)) {
+  formula_str <- paste("`default payment next month` ~", 
+                       paste(selected_features[1:i], collapse = " + "))
+  temp_model <- glm(as.formula(formula_str), data = df, 
+                    family = binomial(link = "logit"))
+  aics[i] <- AIC(temp_model)
+}
+
+feature_progression$AIC <- aics
+feature_progression$AIC_Reduction <- c(0, diff(-aics))
+
+print(feature_progression)
 ```
 
-The stepwise model reduces AIC by 7.51 points by removing 5 less important features. This indicates the stepwise model with 18 features provides a better balance between model fit and complexity than the full model with 23 features.
+## AIC Progression Visualization
+
+Visualize how model fit improves as features are progressively added through forward selection.
+
+```{r aic-progression-plot, fig.width=10, fig.height=6}
+feature_progression_viz <- data.frame(
+  Step = seq_along(selected_features),
+  Features_Count = seq_along(selected_features),
+  AIC = aics
+)
+
+ggplot(feature_progression_viz, aes(x = Features_Count, y = AIC)) +
+  geom_line(color = "steelblue", linewidth = 1.2) +
+  geom_point(color = "steelblue", size = 3) +
+  geom_smooth(method = "loess", se = TRUE, alpha = 0.2, color = "gray") +
+  labs(title = "AIC Progression Through Forward Feature Selection",
+       x = "Number of Features Added",
+       y = "AIC Value",
+       subtitle = "Demonstrates diminishing returns as features are progressively added") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 14, face = "bold"),
+        plot.subtitle = element_text(size = 11, color = "gray40"),
+        axis.text = element_text(size = 10))
+```
+
+## Forward Selection Summary
+
+```{r forward-comparison}
+cat("Initial Model (PAY_0 only) AIC:", AIC(initial_model), "\n")
+cat("Final Selected Model AIC:", AIC(step_model), "\n")
+cat("Total AIC Improvement:", AIC(initial_model) - AIC(step_model), "\n")
+cat("Total Features Selected:", length(coef(step_model)) - 1, "\n")
+```
+
+## Analysis of Feature Selection Results
+
+Our forward stepwise selection process identifies 18 optimal features that collectively minimize the AIC while maintaining model interpretability. The analysis reveals several key insights:
+
+**Initial Model Performance:** Starting with PAY_0 alone, our baseline model achieves an AIC of 28,535.57. This validates that recent repayment status is the strongest individual predictor of credit card default.
+
+**Feature Addition Pattern:** The feature progression table demonstrates that each additional feature provides meaningful AIC reduction, particularly in the early stages: - Features 2-5 (LIMIT_BAL, PAY_3, PAY_AMT1, BILL_AMT1) yield substantial improvements of 92-199 AIC points each - Features 6-12 (MARRIAGE through SEX) provide moderate improvements of 10-39 AIC points - Features 13-18 show diminishing returns with reductions of 0.5-7.8 AIC points, but remain beneficial for model fit
+
+**Total Improvement:** The cumulative AIC improvement from 28,535.57 to 27,917.81 represents a reduction of 617.76 points, indicating that the selected 18-feature model provides substantially better model fit than the baseline single-feature model while maintaining parsimony relative to the full 23-feature model.
+
+**Feature Composition:** The selected features encompass multiple dimensions of creditworthiness: recent repayment status (PAY_0 through PAY_6), payment amounts (PAY_AMT1-6), bill amounts (BILL_AMT1-3), demographic characteristics (MARRIAGE, SEX, EDUCATION, AGE), and available credit (LIMIT_BAL). This diversity suggests that default prediction benefits from both behavioral and demographic information.
 
 ## Feature Importance and Coefficients
 
@@ -207,7 +282,44 @@ model_coef$Significance <- ifelse(model_coef$P_Value < 0.001, "***",
 print(model_coef)
 ```
 
-PAY_0 has the strongest effect with coefficient of 0.578, indicating recent payment delays significantly increase default risk. MARRIAGE, SEX, and EDUCATION show protective effects with negative coefficients. All features except intercept are statistically significant at p \< 0.05 level.
+## Coefficient Analysis and Interpretation
+
+Our logistic regression model reveals that repayment status and payment behavior are the most critical determinants of default risk:
+
+**Strongest Risk Factors (Increase Default Probability):** - **PAY_0 (coefficient: 0.579, p \< 0.001)**: The most dominant predictor. Recent payment status strongly increases default odds, with each unit increase in repayment delay status substantially raising default probability. - **PAY_2 and PAY_3 (coefficients: 0.083 and 0.082, p \< 0.001)**: Two-month and three-month repayment status similarly contribute to default risk, indicating that payment delay patterns persist and compound risk. - **PAY_5 (coefficient: 0.056, p \< 0.01)**: Five-month status also shows positive effect on default risk. - **AGE (coefficient: 0.007, p \< 0.001)**: Older customers have marginally higher default risk.
+
+**Strongest Protective Factors (Decrease Default Probability):** - **MARRIAGE (coefficient: -0.155, p \< 0.001)**: Married individuals show substantially lower default risk compared to unmarried individuals. - **SEX (coefficient: -0.108, p \< 0.001)**: Female customers have lower default risk than male customers. - **EDUCATION (coefficient: -0.102, p \< 0.001)**: Higher education level provides protective effect against default. - **Available Credit (LIMIT_BAL, coefficient: -0.000001, p \< 0.001)**: Higher credit limits correlate with lower default risk, suggesting creditworthy customers receive higher limits. - **Payment Amounts (PAY_AMT1-6, all negative coefficients)**: Greater payment amounts strongly reduce default risk, indicating that customers making larger payments are less likely to default.
+
+**Statistical Significance:** Most features are highly significant at p \< 0.001, demonstrating the robustness of their predictive contributions. A few features (BILL_AMT2, PAY_AMT3, PAY_AMT6) show marginal or non-significant p-values (p \> 0.05), suggesting limited unique predictive value when combined with other features, though they were selected by the forward procedure for their marginal AIC improvements.
+
+## Feature Importance Visualization
+
+Visualize the magnitude and direction of coefficient effects to identify the strongest risk and protective factors.
+
+```{r coefficient-plot, fig.width=10, fig.height=8}
+# Prepare data for plotting (exclude intercept)
+coef_plot_data <- model_coef |>
+  filter(Feature != "(Intercept)") |>
+  arrange(Coefficient) |>
+  mutate(Feature = factor(Feature, levels = Feature),
+         Effect_Type = ifelse(Coefficient > 0, "Risk Factor", "Protective Factor"))
+
+ggplot(coef_plot_data, aes(x = Coefficient, y = Feature, fill = Effect_Type)) +
+  geom_col(width = 0.7) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", linewidth = 0.8) +
+  scale_fill_manual(values = c("Risk Factor" = "#e74c3c", "Protective Factor" = "#27ae60")) +
+  labs(title = "Model Coefficients: Feature Importance",
+       x = "Coefficient Value",
+       y = "Feature",
+       fill = "Effect Type",
+       subtitle = "Red: Increases default risk | Green: Decreases default risk") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 14, face = "bold"),
+        plot.subtitle = element_text(size = 11, color = "gray40"),
+        axis.text.y = element_text(size = 9),
+        axis.text.x = element_text(size = 10),
+        legend.position = "bottom")
+```
 
 # Model Evaluation
 
@@ -216,7 +328,7 @@ PAY_0 has the strongest effect with coefficient of 0.578, indicating recent paym
 Split dataset into 70% training and 30% testing sets for model evaluation.
 
 ```{r train-test-split}
-set.seed(42)
+set.seed(123)
 n <- nrow(df)
 train_idx <- sample(1:n, size = 0.7 * n)
 train_data <- df[train_idx, ]
@@ -231,10 +343,10 @@ cat("Test set size:", nrow(test_data), "\n")
 Fit the stepwise model on training data.
 
 ```{r train-model, warning=FALSE}
-train_model <- glm(`default payment next month` ~ PAY_0 + PAY_2 + PAY_3 + PAY_4 + PAY_5 + 
-                     PAY_6 + LIMIT_BAL + PAY_AMT1 + MARRIAGE + SEX + EDUCATION + 
+train_model <- glm(`default payment next month` ~ PAY_0 + PAY_2 + PAY_3 + PAY_5 + 
+                     LIMIT_BAL + PAY_AMT1 + MARRIAGE + SEX + EDUCATION + 
                      AGE + PAY_AMT2 + PAY_AMT4 + PAY_AMT3 + PAY_AMT5 + BILL_AMT1 + 
-                     PAY_AMT6 + BILL_AMT2,
+                     PAY_AMT6 + BILL_AMT2 + BILL_AMT3,
                    data = train_data,
                    family = binomial(link = "logit"))
 
@@ -264,6 +376,35 @@ pred_class <- as.factor(pred_class)
 
 cm <- confusionMatrix(pred_class, actual, positive = "1")
 print(cm)
+```
+
+## Confusion Matrix Visualization
+
+Visualize the confusion matrix as a heatmap for better interpretation of classification performance.
+
+```{r confusion-matrix-heatmap, fig.width=8, fig.height=6}
+# Extract confusion matrix values
+cm_table <- cm$table
+
+# Convert to data frame for ggplot
+cm_data <- as.data.frame(cm_table)
+colnames(cm_data) <- c("Predicted", "Actual", "Count")
+
+# Create heatmap
+ggplot(cm_data, aes(x = Actual, y = Predicted, fill = Count)) +
+  geom_tile(color = "black", linewidth = 1) +
+  geom_text(aes(label = Count), fontface = "bold", size = 5, color = "white") +
+  scale_fill_gradient(low = "#fee5d9", high = "#a50f15") +
+  labs(title = "Confusion Matrix Heatmap",
+       x = "Actual Class (0 = No Default, 1 = Default)",
+       y = "Predicted Class (0 = No Default, 1 = Default)",
+       fill = "Count",
+       subtitle = "True Negatives (top-left) and True Positives (bottom-right) indicate correct predictions") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 14, face = "bold"),
+        plot.subtitle = element_text(size = 11, color = "gray40"),
+        axis.text = element_text(size = 11),
+        panel.grid = element_blank())
 ```
 
 ## Extract and Display Performance Metrics
@@ -347,8 +488,18 @@ legend("bottomright", paste("AUC =", round(auc_value, 4)))
 
 ### ROC Analysis and Model Discrimination
 
-**AUC: 0.7236**
+**AUC: 0.7117**
 
-The Area Under the ROC Curve (AUC) of 0.7236 indicates good discriminative ability. The model performs significantly better than random classification (AUC = 0.5), demonstrating its effectiveness in distinguishing between default and non-default cases. However, there is room for improvement, as an AUC greater than 0.80 would indicate excellent discrimination.
+The Area Under the ROC Curve (AUC) of 0.7117 indicates good discriminative ability. The model demonstrates its effectiveness in distinguishing between default and non-default cases, performing substantially better than random classification (AUC = 0.5). While there remains room for improvement toward excellent discrimination (AUC \> 0.80), the current performance reflects a reasonable trade-off given the inherent class imbalance in credit default prediction.
 
-The ROC curve visualizes the trade-off between sensitivity (true positive rate) and specificity (1 - false positive rate) across different classification thresholds. The current threshold of 0.5 produces the high specificity and low sensitivity observed in the confusion matrix.
+The ROC curve visualizes the relationship between sensitivity (true positive rate) and specificity (1 - false positive rate) across different classification thresholds. At the standard threshold of 0.5, the model achieves the high specificity (96.98%) and low sensitivity (25.09%) observed in the confusion matrix, reflecting its conservative approach to default prediction.
+
+## Overall Model Assessment and Conclusions
+
+Our logistic regression model for credit card default prediction demonstrates solid performance across multiple evaluation metrics:
+
+**Model Strengths:** - Achieves 81.34% overall accuracy on the test set - Exhibits exceptional specificity (96.98%), effectively minimizing false alarms to non-defaulting customers - Maintains reasonable precision (69.74%), ensuring that most predicted defaults warrant genuine concern - Provides interpretable coefficients that align with domain knowledge (recent payment delays increase default risk, while certain demographic factors provide protective effects)
+
+**Model Limitations:** - Low sensitivity (25.09%) results in missing approximately 75% of actual defaults - This conservative nature reflects the severe class imbalance (approximately 78% non-defaulters, 22% defaulters) in the dataset - The AUC of 0.7117 suggests moderate discriminative power
+
+**Practical Implications:** This model is most suitable for scenarios where avoiding false alarms (unnecessary customer interventions) is prioritized over detecting every potential default. Financial institutions using this model should consider supplementary risk assessment methods to catch high-risk accounts that the model may overlook, or employ threshold optimization to increase sensitivity for strategic accounts requiring heightened monitoring.
