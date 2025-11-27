@@ -115,25 +115,25 @@ Consolee NISINGIZWE
 \rule{14cm}{0.5pt}\\[0.3cm]
 \end{center}
 
-This report studies how to predict credit card default using logistic regression. The question matters because banks want to reduce losses while keeping fair treatment of customers. We use the well-known dataset of 30,000 credit card clients from Taiwan to build and evaluate a simple, transparent model.
+This report presents our group's work on predicting credit card defaults through logistic regression. Banks and financial companies struggle with figuring out which customers might not pay back their debts. We noticed that people who default usually share similar patterns in their payment history. This matters a lot because banks want to cut their losses but also treat all customers fairly. For our analysis, we worked with a dataset containing records from 30,000 credit card users in Taiwan.
 
 \vspace{6pt}
 
-\textbf{Key Findings:}
+\textbf{What We Found:}
 \begin{itemize}
-    \item Recent payment behavior is the strongest predictor of default, increasing risk by 78\%
-    \item Our model achieves 81.2\% overall accuracy with 97.2\% specificity in identifying safe customers
-    \item 18 features were selected through forward stepwise AIC optimization from an initial 23 variables
-    \item Model discrimination ability (AUC) of 0.725 indicates reasonable predictive performance
+    \item Recent payment behavior matters most - if someone paid late recently, their default risk jumps by 78\%
+    \item The model gets things right about 81.2\% of the time overall, and it's really good (97.2\%) at spotting customers who won't default
+    \item We narrowed down from 23 possible features to 18 useful ones using forward stepwise selection with AIC
+    \item The model's ability to separate defaulters from non-defaulters (AUC = 0.725) is decent but could be better
 \end{itemize}
 
-Recent payment behavior is the strongest indicator of default risk. The single most important variable is whether the most recent payment was late. Other variables (education, marital status, and credit limit) add information, but payment patterns remain the main driver.
+Basically, how people paid recently tells us way more than anything else. Whether they were late on their most recent payment is the biggest red flag. Things like education, marriage status, and credit limits help a bit, but payment history is where it's at.
 
-The model identifies non-defaulters with 97.2\% specificity, so it rarely marks reliable payers as risky. It detects about 25\% of actual defaulters (sensitivity). This trade-off is typical when defaults are less common than non-defaults.
+One thing we noticed is that our model is much better at identifying people who won't default (97.2\%) than catching those who will (only 25\%). This happens because there are way more people who pay on time than those who don't in our dataset.
 
 \vspace{6pt}
 
-\textbf{Practical Implications:} Financial institutions can use these insights to focus risk management efforts, particularly by monitoring recent payment delays as early warning signals. The model serves best as a screening mechanism for high-confidence default cases, complementing broader credit assessment strategies.
+\textbf{What This Means in Practice:} Banks could actually use what we found here to watch for warning signs, especially when customers start missing payments. Our model works best as a first filter to spot obvious risk cases, but it shouldn't be the only thing banks rely on when making credit decisions.
 
 \begin{center}
 \rule{14cm}{0.5pt}\\[0.3cm]
@@ -149,50 +149,36 @@ The model identifies non-defaulters with 97.2\% specificity, so it rarely marks 
 
 \section{Introduction}
 
-Credit card default is a major challenge for banks. As consumer credit becomes more common worldwide, lenders need clear and practical ways to estimate default risk and manage it.
+Credit card defaults are a real headache for banks. With more and more people using credit cards everywhere, lenders really need solid methods to figure out who might not pay them back.
 
 \subsection*{Background and Motivation}
 
-The dataset contains 30,000 credit card clients from Taiwan. Each client has 23 variables: demographics, credit limit, six months of payment status, six months of bill amounts, and payment amounts. The target indicates whether the client defaulted in the next month.
+We're working with data from 30,000 credit card customers in Taiwan. For each person, we have 23 different records. Take for example, their age, education, credit limit, how they paid over six months, their bill amounts, and how much they actually paid. The key thing we're trying to predict is whether they defaulted the following month.
 
-Financial institutions face a clear question: which customers are likely to default? Traditional rules can be subjective. Data-driven models offer transparent and testable answers.
+Banks basically want to know: who's going to default? The old way of doing things relies a lot on gut feelings and basic rules. But using data and statistical models gives us a more objective way to answer this question.
 
 \subsection*{Problem Statement}
 
-When customers do not pay on time, banks face losses, higher collection costs, and more risk. We aim to predict default early enough to take reasonable actions.
+When people don't pay their bills, banks lose money, spend more trying to collect what's owed, and take on extra risk. What we're trying to do is predict defaults early enough so banks can actually do something about these clients.
 
 \subsection*{Research Objectives}
 
-Our goals are to:
+What we wanted to accomplish:
 
 \begin{enumerate}
-    \item Find which features best predict defaults
-    \item Build a logistic regression model to estimate default probability
-    \item Use AIC-based feature selection to pick the most important variables
-    \item Evaluate how well the model works using standard metrics
+    \item Figure out which factors actually matter when predicting defaults
+    \item Build a logistic regression model that can estimate the chances that someone will default or not
+    \item Use AIC to help us pick only the variables that really add value to the model
+    \item Test our model properly to see how well it actually performs on new data
 \end{enumerate}
 
 \subsection*{Data and Methods}
 
-We work with 30,000 credit card clients from Taiwan containing 23 variables including demographics (age, gender, education, marital status), credit information (credit limit), payment history (six months of payment status records), and financial amounts (bill amounts and payment amounts). 
+Our dataset has 30,000 people with 23 different pieces of info like age, gender, education, and marital status, plus their credit limit, how they paid over six months, and their bill and payment amounts. 
 
-Logistic regression is our chosen modeling approach because it provides several advantages: interpretability of coefficients, computational efficiency at scale, and direct probability estimates for decision-making. Our modeling process follows established best practices: (1) stratified train-test splitting to maintain class balance during evaluation, (2) forward stepwise feature selection using AIC to identify important variables while avoiding overfitting, (3) multiple performance metrics to assess model quality across different dimensions, and (4) analysis of model trade-offs for practical implementation guidance.
+We picked logistic regression for a few good reasons: you can actually understand what the model's doing, it runs pretty fast even with lots of data, and it gives us probabilities instead of just yes/no answers. Here's how we approached it: First, we split our data into training and test sets (keeping the same proportion of defaulters in both). Then we used forward stepwise selection with AIC to find which variables actually help without making the model too complicated. Finally, we looked at different metrics to really understand where our model does well and where it struggles.
 
-The workflow encompasses data cleaning to handle quality issues, exploratory data analysis to understand variable relationships, feature selection to identify key predictors, model training on the training set, and comprehensive performance evaluation on held-out test data.
-
-\subsection*{Report Structure}
-
-\begin{itemize}[leftmargin=1.2cm]
-    \item Introduction: context, motivation, problem statement, objectives, and methods.
-    \item Dataset and Data Preparation: data overview, cleaning, and target distribution.
-    \item Exploratory Data Analysis: key patterns and variable relationships with default.
-    \item Feature Selection and Modeling: full model, AIC evaluation, and forward selection.
-    \item Model Coefficients and Interpretation: effects of selected predictors on default risk.
-    \item Model Evaluation: train/test split, predictions, and evaluation protocol.
-    \item Results and Model Performance: metrics, confusion matrix, and trade-offs.
-    \item ROC Curve and Model Discrimination: threshold behavior and AUC analysis.
-    \item Conclusion: summary of findings, practical implications, limitations, and improvement avenues.
-\end{itemize}
+Our process went like this: clean the data, explore it to see what patterns pop up, select the important features, train the model, and then test it on data it hasn't seen before (test sets).
 
 \section{Dataset and Data Preparation}
 
@@ -208,13 +194,11 @@ Our dataset contains 30,000 credit card clients from Taiwan with 23 features. Th
 
 The target variable indicates whether a client defaulted (0/1). There are no missing values.
 
-\newpage
-
 \subsection*{Data Cleaning}
 
-We removed the ID variable because it is only an identifier. The target variable was converted to a factor with two levels: 0 (no default) and 1 (default). All 30,000 observations were kept.
+We dropped the ID column since it's just a label and doesn't tell us anything useful (it represent the row number of all customer records). The default variable (our target) is either 0 for no default or 1 for default. We kept all 30,000 records since our data is clean.
 
-The class distribution is 21.12\% default and 78.88\% non-default. This imbalance matters when we evaluate performance.
+One important thing: about 21\% of customers in our data defaulted while 79\% didn't. This imbalance is something we had to keep in mind when evaluating our model later.
 
 \begin{figure}[h]
     \centering
@@ -227,7 +211,7 @@ The class distribution is 21.12\% default and 78.88\% non-default. This imbalanc
 
 \vspace{0.3cm}
 
-Understanding the data through visual exploration is essential before building predictive models. The exploratory plots reveal relationships between key variables and default outcomes, helping us identify which factors have the strongest associations with credit risk.
+Before jumping into modeling, we spent time looking at the data visually. It's really helpful to see what patterns exist and which variables seem connected to defaults.
 
 \begin{figure}[H]
     \centering
@@ -238,47 +222,46 @@ Understanding the data through visual exploration is essential before building p
 
 \vspace{0.3cm}
 
-Examining patterns in the data is a crucial first step before modeling. Visual exploration helps us understand the relationships between predictor variables and default outcomes, revealing which factors appear most strongly associated with credit risk.
+We looked at several patterns that jumped out:
 
-\textbf{Payment Status (PAY\_0):} The most striking pattern we see is in recent payment behavior. Customers with recent payment delays (coded 1, 2, 3, etc.) show dramatically different default rates compared to those who paid on time. This is clearly the strongest signal for predicting defaults.
+\textbf{Payment Status (PAY\_0):} This was the biggest standout. People who were late on recent payments had way higher default rates than those who paid on time. The numbers are coded as follows: -1 means paid on time, 1 means one month late, 2 means two months late, and so on. The time delay in payment really influence how likely clients were to default.
 
-\textbf{Credit Limit:} There's a clear relationship between credit limit and default risk. Customers with higher credit limits tend to have lower default rates, which likely reflects the bank's initial assessment of customer reliability.
+\textbf{Credit Limit:} People with higher credit limits tend to default less. This actually make sense, because probably banks gave higher limits to people they already trusted more.
 
-\textbf{Payment Amounts:} Customers who make larger payments show lower default rates. This makes intuitive sense: active payment behavior indicates willingness and ability to meet obligations.
+\textbf{Payment Amounts:} Bigger payments generally meant lower default risk, which is somehow straightforward. If you're paying a lot, you're probably trying to stay on top of your debt.
 
-\textbf{Age and Demographics:} While age varies between defaulters and non-defaulters, the pattern is less pronounced than with payment history. Education level and marital status also show relationships with default, though less dramatically than payment behavior.
+\textbf{Age and Demographics:} Age did vary between the two groups, but not as dramatically as payment behavior. Education and marital status showed some patterns too, but nothing as strong as the payment stuff.
 
-These patterns tell us that payment behavior dominates as a predictor, though other factors provide additional useful information.
-
-\newpage
+\textbf{Bottom line}: payment behavior is clearly the main predictor that matters the most, but the others also add some value to the model.
 
 \section{Feature Selection and Modeling}
 
 \subsection*{The Feature Selection Approach}
 
-With 23 variables available, we need to decide which ones are truly important. Building a model with all 23 variables might lead to overfitting, where the model learns noise instead of genuine patterns. Using too few variables might miss important information. Forward stepwise selection with AIC provides a principled way to balance these concerns: it starts with the best single predictor and adds variables one by one only if they genuinely improve model fit.
+We had 23 variables to choose from, but that doesn't mean we should use all of them. Including everything might cause overfitting - basically the model would memorize our specific data instead of learning real patterns. But using too few might mean we miss important information. Forward stepwise selection with AIC helps us find a middle ground: we start with the best single variable and keep adding others only if they actually improve the model.
 
-Looking at the exploratory plots we examined earlier, several important patterns become clear:
+From our earlier plots, here's what stood out:
 
 \begin{itemize}
-    \item \textbf{Payment Status (PAY\_0):} Customers with recent payment delays show noticeably different default rates. The values represent: $-1 =$ paid on time, $1 =$ one-month delay, $2 =$ two-month delay, and so on. Individuals with longer payment delays tend to default much more frequently.
+    \item \textbf{Payment Status (PAY\_0):} This was huge. Recent late payments were a big red flag. Remember: $-1 =$ paid on time, $1 =$ one month late, $2 =$ two months late, etc. The longer the delay, the more likely they'd default.
 
-    \item \textbf{Age:} Age distributions differ between defaulting and non-defaulting customers. The boxplots illustrate how age varies within each group.
+    \item \textbf{Age:} The age distributions looked different between the two groups, though it wasn't as revealing as the payment history.
 
-    \item \textbf{Credit Limit:} Customers with higher credit limits show different default patterns. This likely reflects the bank's tendency to grant higher credit limits to customers perceived as lower risk.
+    \item \textbf{Credit Limit:} Higher limits usually meant lower default rates, probably because banks gave bigger limits to people they already trusted.
 
-    \item \textbf{Payment Amounts:} Customers who make larger payments are generally less likely to default. This is intuitive: consistent or large payments signal the ability and willingness to pay off debt.
+    \item \textbf{Payment Amounts:} Larger payments generally meant lower risk - makes sense since it shows you're working to pay things off.
 
-    \item \textbf{Education and Marriage:} These demographic factors also show some relationship with default behavior, although the patterns are less pronounced compared to payment history.
+    \item \textbf{Education and Marriage:} These showed some connection to default behavior, but not nearly as strong as payment patterns.
 \end{itemize}
-This exploratory analysis helps explain why certain features become important in our predictive model later on.
 
+These observations helped us understand why certain variables ended up being important in our final model.
 
 
 \section{Feature Selection and Modeling}
 
 \subsection*{Full Logistic Regression Model}
-A logistic regression model was fitted to all 23 predictors. Several predictors were statistically significant, especially late payment indicators. The full model had residual deviance 27877 and AIC 27925. PAY\_0 (most recent repayment status) was the strongest single predictor, with AIC 28535.57. PAY\_2 and PAY\_3 followed. Bill amounts and age had higher AIC values and weaker individual contributions.
+
+We first tried fitting a model with all 23 variables. A bunch of them were statistically significant, especially the late payment ones. The full model had a residual deviance of 27,877 and AIC of 27,925. When we looked at variables individually, PAY\_0 (the most recent payment status) was clearly the strongest with AIC 28535.57. PAY\_2 and PAY\_3 came next. Things like bill amounts and age didn't add as much on their own.
 
 
 \subsection*{Individual Feature AIC Evaluation}
@@ -304,17 +287,17 @@ PAY\_AMT3   & 31527.77 & 2992.199  \\
 \caption{Individual Feature AIC Evaluation}
 \end{table}
 
-The lowest AIC was produced by PAY\_0, followed by PAY\_2 and PAY\_3. Variables such as AGE and the BILL\_AMT series had higher AIC values, indicating lower predictive power.
+PAY\_0 had the lowest AIC, with PAY\_2 and PAY\_3 coming after. Things like AGE and the BILL\_AMT variables had much higher AIC values, which means they weren't as useful on their own.
 
 \subsection*{Forward Stepwise Feature Selection using AIC}
 
-We start with the best predictor (PAY\_0) and add features one by one only if they improve the model AIC.
+The idea is simple: start with PAY\_0 (our best predictor) and then add other variables one at a time, but only if they actually make our model better.
 
 \subsection*{Forward Selection Results}
 
-Using forward stepwise AIC selection, we identified 18 of 23 features. Starting with PAY\_0 (AIC = 28535.57), we added features that reduced AIC. The final model has AIC = 27917.81, a reduction of 617.76 points.
+Through this process, we ended up with 18 out of 23 features. Starting from PAY\_0 (AIC = 28,535.57), we kept adding variables that lowered the AIC. Our final model has AIC = 27,917.81, that's a drop of about 618 points, which is clearly good.
 
-The selected features include: payment history (PAY\_0 through PAY\_5), payment amounts, bill amounts, credit limit, and demographics (age, education, marital status, gender).
+The 18 features we kept were: all the payment history variables (PAY\_0 through PAY\_5), payment amounts, bill amounts, credit limit, and demographic details like age, education, marital status, and gender.
 
 \begin{figure}[H]
     \centering
@@ -325,39 +308,28 @@ The selected features include: payment history (PAY\_0 through PAY\_5), payment 
 
 \vspace{0.3cm}
 
-The AIC (Akaike Information Criterion) progression shows how model fit improves as we add features through forward selection. Each new feature reduces AIC, indicating better model performance. The curve plateaus after adding 18 features, suggesting that additional variables provide minimal improvement in explanatory power.
+This plot shows how the AIC drops as we add more features. Each time we add a good variable, the AIC goes down (which is what we want). After about 18 features, the curve flattens out, which means adding more variables wouldn't really help the model much.
 
 \section{Model Coefficients and Interpretation}
 
-After fitting the logistic regression model with the 18 selected features, we can interpret the coefficients to understand which factors increase or decrease default risk. Positive coefficients indicate increased default risk, while negative coefficients indicate protective factors that reduce risk.
-
-
-
-
-
-
-
-
-
-
-
+Now let's talk about what the model actually found. With our 18 features, we can look at the coefficients to see what increases or decreases default risk. Positive numbers mean higher risk, negative numbers mean lower risk.
 
 \subsection*{Key Risk and Protective Factors}
 
-\textbf{Factors that INCREASE default risk:}
+\textbf{Things that INCREASE default risk:}
 \begin{itemize}
-    \item \textbf{PAY\_0} (coefficient = 0.577): Recent payment delays are the strongest predictor. Each month of delay increases default odds by 78\%.
-    \item \textbf{PAY\_2, PAY\_3, PAY\_5}: Earlier payment delays also increase risk, showing that payment problems tend to persist.
+    \item \textbf{PAY\_0} (coefficient = 0.577): Being late on recent payments is the biggest factor. Each month of delay bumps up your default odds by 78\%.
+    \item \textbf{PAY\_2, PAY\_3, PAY\_5}: Past payment delays also matter - payment issues tend to stick around.
 \end{itemize}
 
 \newpage
 
-\textbf{Factors that DECREASE default risk:}
+\textbf{Things that DECREASE default risk:}
 \begin{itemize}
-    \item \textbf{MARRIAGE} (coefficient = -0.156): Married customers have 14\% lower default odds.
-    \item \textbf{EDUCATION} (coefficient = -0.105): Higher education reduces default odds by 10\%.
-    \item \textbf{Payment amounts}: Larger payments strongly reduce default risk.
-    \item \textbf{LIMIT\_BAL}: Higher credit limits suggest the bank already assessed lower risk.
+    \item \textbf{MARRIAGE} (coefficient = -0.156): Being married seems to help - it lowers default odds by about 14\%.
+    \item \textbf{EDUCATION} (coefficient = -0.105): More education helps too, cutting default odds by around 10\%.
+    \item \textbf{Payment amounts}: Making bigger payments is a good sign and lowers risk quite a bit.
+    \item \textbf{LIMIT\_BAL}: Having a higher credit limit usually means the bank already thought you were lower risk.
 \end{itemize}
 
 \begin{figure}[h]
@@ -368,33 +340,33 @@ After fitting the logistic regression model with the 18 selected features, we ca
 
 \vspace{0.4cm}
 
-Most factors are statistically significant at $p < 0.001$, providing strong evidence that these variables genuinely influence default risk. A few variables (BILL\_AMT2, PAY\_AMT3, PAY\_AMT6) are not individually significant at the 0.05 level, but they were retained by our forward selection process because they contribute small improvements to overall model fit measured by AIC.
+Most of these variables are statistically significant at $p < 0.001$, which means we can be pretty confident they actually matter. A couple variables (BILL\_AMT2, PAY\_AMT3, PAY\_AMT6) aren't significant on their own at the usual 0.05 level, but we kept them because the AIC selection process showed they still add something to the overall model.
 
 \vspace{0.5cm}
 
 \section{Model Evaluation}
 
-Evaluating model performance on independent test data is crucial to assess how well the model generalizes to new customers not seen during training.
+We need to test our model on fresh data it hasn't seen before. This tells us whether it'll actually work on new customers or if it just memorized the training data.
 
 \subsection*{Data Preparation for Evaluation}
 
-To fairly assess our model's performance, we split the 30,000 observations into training and test sets using stratified sampling. This means we randomly divided the data (70\% training, 30\% test) while maintaining the same 21\% default rate in both sets. This ensures the test set is representative of the real world where about 1 in 5 customers default. The training set contained 21,001 observations while the test set had 8,999 observations.
+To test this properly, we split our 30,000 records into training (70\%) and test (30\%) sets. We used stratified sampling, which just means we made sure both sets had the same 21\% default rate. This keeps things fair - the test set looks like what we'd see in the real world. We ended up with 21,001 records for training and 8,999 for testing.
 
 \subsection*{Model Predictions}
 
-We trained on the training set and predicted on the test set. Predicted probabilities range from $1.12 \times 10^{-5}$ to 0.994. For classification, we used threshold 0.5 (default if probability $>$ 0.5).
+We trained the model on the training set, then used it to predict on the test set. The predicted probabilities ranged from basically zero ($1.12 \times 10^{-5}$) all the way up to 0.994. We used 0.5 as our cutoff - so if the model predicted a probability above 0.5, we called it a default.
 
 \subsection*{Performance Metrics}
 
-To understand model performance, several metrics are important:
+There are several ways to measure how well our model does:
 
 \begin{itemize}
-    \item \textbf{Accuracy}: Overall percentage of correct predictions
-    \item \textbf{Sensitivity}: Of actual defaulters, what percentage did we identify?
-    \item \textbf{Specificity}: Of actual non-defaulters, what percentage did we correctly identify?
-    \item \textbf{Precision}: When we predict default, how often are we correct?
-    \item \textbf{Balanced Accuracy}: Average of sensitivity and specificity (important when classes are imbalanced)
-    \item \textbf{AUC}: Area under the ROC curve - measures discrimination ability across all thresholds
+    \item \textbf{Accuracy}: How often does it get the answer right overall?
+    \item \textbf{Sensitivity}: Out of everyone who actually defaulted, how many did we catch?
+    \item \textbf{Specificity}: Out of everyone who didn't default, how many did we correctly identify?
+    \item \textbf{Precision}: When we predict someone will default, how often is that right?
+    \item \textbf{Balanced Accuracy}: The average of sensitivity and specificity (this matters since we have way more non-defaulters)
+    \item \textbf{AUC}: Area under the ROC curve - basically tells us how good the model is at separating the two groups
 \end{itemize}
 
 \subsection*{Confusion Matrix}
@@ -406,7 +378,7 @@ To understand model performance, several metrics are important:
     \label{fig:confusion_matrix}
 \end{figure}
 
-The confusion matrix shows predicted versus actual classes. True negatives and true positives are on the diagonal; false positives and false negatives are off the diagonal.
+The confusion matrix shows what the model predicted vs. what actually happened. The diagonal shows when we got it right (true negatives and true positives). Off the diagonal is where we messed up (false positives and false negatives).
 
 \section{Results and Model Performance}
 
@@ -432,60 +404,60 @@ AUC               & 0.7250  & Discrimination between default and non-default \\
 \subsection*{Detailed Performance Analysis}
 
 \textbf{Accuracy (81.20\% with 95\% CI: [80.38\%, 82.00\%])} \\
-The model correctly predicts customer default status 81.20\% of the time. This means that out of every 100 customers, the model accurately classifies about 81. The narrow confidence interval suggests the result is stable across different samples.
+Our model gets it right 81.20\% of the time overall. So out of 100 people, we'd correctly classify about 81 of them. The confidence interval is pretty tight, which is good - means the result should hold up.
 
 
 
-\textbf{Sensitivity (24.72\%): Default Detection Rate} \\
-The model only identifies about 24.72\% of customers who actually default. If 100 customers were going to default, the model would correctly detect only about 25. The low sensitivity reflects the model's conservative nature in the presence of class imbalance.
+\textbf{Sensitivity (24.72\%): Catching Defaulters} \\
+This is where we struggle. We only catch about 25\% of people who actually default. If 100 people were going to default, we'd only spot about 25 of them. This is partly because of the class imbalance - the model is being pretty conservative.
 
 
 
-\textbf{Specificity (97.23\%): Non-Default Identification} \\
-The model is highly accurate in identifying customers who will not default. It correctly classifies 97.23\% of non-defaulters, meaning it rarely mislabels good customers as risky.
+\textbf{Specificity (97.23\%): Identifying Safe Customers} \\
+On the flip side, we're really good at identifying people who won't default. We correctly identify 97.23\% of them. So we almost never wrongly label a good customer as risky.
 
 
 
-\textbf{Precision (71.72\%): Prediction Reliability} \\
-When the model predicts a customer will default, it is correct 71.72\% of the time. This means its warnings are generally reliable.
+\textbf{Precision (71.72\%): How Often We're Right About Defaults} \\
+When we do predict someone will default, we're right about 72\% of the time. So our warnings are fairly reliable when we make them.
 
 
 
 \textbf{Balanced Accuracy (60.98\%)} \\
-Given the imbalanced dataset (22\% defaults, 78\% non-defaults), the balanced accuracy provides a fairer evaluation. A score of 60.98\% indicates moderate performance across both classes.
+Since our data is imbalanced (22\% defaults, 78\% don't), this metric gives us a fairer picture. At about 61\%, we're doing okay but not great across both groups.
 
 
 
-\textbf{AUC (0.7250): Discrimination Ability} \\
-The Area Under the Curve (AUC) of 0.7250 shows that the model has reasonable ability to distinguish between defaulters and non-defaulters. It performs better than random guessing (0.5), though still leaves room for improvement.
+\textbf{AUC (0.7250): How Well We Separate the Groups} \\
+An AUC of 0.7250 means our model does a decent job of telling defaulters apart from non-defaulters. It's definitely better than just guessing randomly (which would be 0.5), but there's definitely room to improve.
 
 \subsection*{What the Trade-offs Mean}
 
-The model is conservative: it identifies non-defaulters well (high specificity) but misses many defaulters (low sensitivity). Reasons include:
+Our model is definitely on the conservative side: it's great at spotting safe customers but misses a lot of actual defaulters. Here's why:
 
 \begin{enumerate}
-    \item The dataset is imbalanced, with many more non-defaulters.
-    \item The default probability threshold is set to 0.5, which may not be optimal.
-    \item Logistic regression tends to favor the majority class unless adjusted.
+    \item The data has way more non-defaulters, so the model leans that way
+    \item We're using 0.5 as our threshold, which might not be the best choice
+    \item Logistic regression naturally favors the bigger class unless you do something about it
 \end{enumerate}
 
-In practice, the model can flag high-risk accounts. It should not be the sole decision tool.
+In the real world, this model could be useful for flagging obviously risky accounts. But banks definitely shouldn't use it as their only decision-making tool.
 
 \section*{Practical Uses and Limitations}
 
 \begin{itemize}
-    \item \textbf{Strengths}: Excellent at identifying safe customers (97\% specificity).
-    \item \textbf{Weaknesses}: Poor at catching all risky customers (only 25\% sensitivity).
-    \item \textbf{Best For}: Detecting obvious risk cases such as recent payment delays.
-    \item \textbf{May Miss}: Customers who show sudden default behavior despite prior good records.
-    \item \textbf{Possible Improvements}: Adjusting the classification threshold could boost sensitivity, though at the cost of more false alarms.
+    \item \textbf{What It Does Well}: Really good at spotting safe customers (97\% specificity).
+    \item \textbf{Where It Falls Short}: Misses a lot of people who actually default (only 25\% sensitivity).
+    \item \textbf{Best Use Case}: Catching obvious red flags like recent late payments.
+    \item \textbf{What It Might Miss}: People who suddenly default even though they had a clean record.
+    \item \textbf{How To Improve}: We could lower the threshold to catch more defaults, but that would also mean more false alarms.
 \end{itemize}
 
 \section{ROC Curve and Model Discrimination}
 
 \vspace{0.5cm}
 
-The Receiver Operating Characteristic (ROC) curve provides a comprehensive assessment of model performance across all possible classification thresholds. This visualization is particularly valuable because it reveals how sensitivity and specificity change as we adjust the probability cutoff for predicting default. In practice, different financial institutions may prefer different trade-offs between sensitivity and specificity based on their risk tolerance and business strategy.
+The ROC curve shows how our model performs at different probability thresholds. It's really useful because you can see how sensitivity and specificity change when you adjust the cutoff. Different banks might want different trade-offs depending on how much risk they're willing to take.
 
 \vspace{0.5cm}
 
@@ -498,11 +470,11 @@ The Receiver Operating Characteristic (ROC) curve provides a comprehensive asses
 
 \vspace{0.5cm}
 
-The ROC curve shows how our model performs across different probability thresholds. We currently use 0.5: if the model predicts a probability above 0.5, we classify it as default. But this is flexible. Lower the threshold below 0.5 and we catch more defaulters (but get more false alarms). Raise it above 0.5 and we get fewer false alarms (but miss some real defaulters).
+Right now we're using 0.5 as our threshold - predict default if probability is above 0.5. But we could change that. If we lower it, we'd catch more actual defaulters but also get more false alarms. If we raise it, we'd have fewer false alarms but miss more real defaulters.
 
-Our AUC of 0.725 means the model is better than random chance at ranking customers by default risk. If we picked one real defaulter and one real non-defaulter at random, the model would correctly give the defaulter the higher default probability about 72.5\% of the time. That's solid, but there's room for improvement. The curve shows we're better at catching non-defaulters than actual defaulters: which is what we expected from our earlier results.
+Our AUC of 0.725 tells us the model is doing better than random guessing. Here's one way to think about it: if you randomly picked one person who defaulted and one who didn't, our model would correctly give the defaulter a higher risk score about 72.5\% of the time. That's decent but not amazing. The curve confirms what we already knew - we're way better at spotting non-defaulters than catching defaulters.
 
-Banks can adjust the threshold based on what they care about most. If they want to avoid false alarms, use a higher threshold. If they want to catch defaults early, use a lower threshold.
+The nice thing is banks could adjust the threshold based on their priorities. Want fewer false alarms? Use a higher threshold. Want to catch more defaults early? Go lower.
 
 \vspace{1cm}
 
@@ -510,12 +482,12 @@ Banks can adjust the threshold based on what they care about most. If they want 
 
 \vspace{0.5cm}
 
-Predicting credit card defaults is genuinely hard. There's always a trade-off between catching defaults and avoiding false alarms. Our model handles this trade-off in a particular way: it's very good at marking safe customers as safe (97\% specificity), but it misses a lot of actual defaulters (25\% sensitivity). That's the reality of our dataset, because more people pay than defaults, so the model naturally leans toward predicting non-default.
+Honestly, predicting credit card defaults is tough. You're always balancing between catching people who'll default and not falsely accusing good customers. Our model ended up being really conservative - it's great at identifying safe people (97\% specificity) but misses most of the actual defaulters (only 25\% sensitivity). This happened because our data has way more people who pay than who default, so the model kind of defaults to predicting "won't default."
 
-However, that doesn't mean our model performs poorly. When it says someone is risky, it's right about 72\% of the time. And when it says someone is safe, it's almost always right. For a bank, this means: trust the model when it flags someone as low-risk. Don't be surprised when it misses some defaulters. Recent payment behavior turned out to be the real signal here, even more than age, education, or any other demographic factor.
+But that doesn't mean it's useless. When it does flag someone as risky, it's right about 72\% of the time. And when it says someone's safe, it's almost always correct. So, it is safe for banks or financial institutions to trust the model when it marks someone as low-risk. Just don't expect it to catch every single defaulter. The biggest takeaway is that recent payment behavior matters way more than feature like age or education.
 
-So, where does our model fit well in practice? It works best as a screening tool, not the final decision. A bank could use it to flag accounts for closer inspection. Or adjust the threshold lower to catch more defaults, knowing that will create more false alarms. Different banks will want different trade-offs depending on their risk tolerance.
+Where would this actually be useful? Probably as a first screening step, not the final answer. A bank could use it to quickly spot accounts that need a closer look. They could also lower the threshold to catch more defaults if they're willing to deal with more false positives. It really depends on how risk-averse they are.
 
-This work shows that even with data imbalance and real-world complexity, a straightforward logistic regression model with proper feature selection can meaningfully outperform basic approaches. It's not perfect, but it's very useful. And that's what matters in practice which will help guide decision-making.
+What we learned is that even with messy, imbalanced real-world data, a simple logistic regression with good feature selection can work pretty well. It's not perfect by any means, but it's definitely better than nothing and could actually help inform decisions.
 
 \end{document}
