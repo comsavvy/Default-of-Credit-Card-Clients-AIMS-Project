@@ -173,21 +173,6 @@ library(gridExtra)
 grid.arrange(plot_pay0, plot_age, plot_limit, plot_payamt, plot_edu, plot_marr, ncol = 3)
 ```
 
-### What We Notice
-
-Looking at these plots, some patterns are clear:
-
--   **Payment Status (PAY_0)**: Customers with recent payment delays show different default rates. The values represent: -1 = paid on time, 1 = one month delay, 2 = two months delay, and so on. People with longer payment delays default much more often.
-
--   **Age**: Older customers might have different default patterns. The boxes show the spread of ages for each group.
-
--   **Credit Limit**: Customers with higher credit limits seem to have different default rates. Banks probably gave higher limits to safer customers.
-
--   **Payment Amounts**: Customers who make bigger payments are less likely to default, which makes sense - if you're paying off your debt, you won't default.
-
--   **Education & Marriage**: These demographic factors might also play a role, though the patterns are less informative.
-
-This exploration helps us see **why** certain features will be important in our model later on.
 
 # Feature Selection and Modeling
 
@@ -320,19 +305,6 @@ cat("Total AIC Improvement:", AIC(initial_model) - AIC(step_model), "\n")
 cat("Total Features Selected:", length(coef(step_model)) - 1, "\n")
 ```
 
-## Analysis of Feature Selection Results
-
-Using forward selection, we identified 18 out of 23 features as the most important for predicting credit card defaults. This means we dropped 5 less-important features without losing much predictive power, which actually makes our model simpler and easier to explain.
-
-**Where We Started:** When we began with just PAY_0 (the most recent payment status), the model had an AIC of 28,535.57. This shows right away that how someone paid recently is the biggest clue about whether they'll default.
-
-**How Features Were Added:** Looking at our results, we can see that the first few features we added made huge differences: - The first 4 extra features (LIMIT_BAL, PAY_3, PAY_AMT1, BILL_AMT1) each saved about 92-199 AIC points - The next batch (6-12 features) helped less, saving about 10-39 AIC points each - After that, each new feature only helped a tiny bit (0.5-7.8 AIC points), but we kept them because they still improved the model
-
-**Total Improvement:** We went from an AIC of 28,535.57 down to 27,917.81 - that's about 617.76 drop! This shows our 18-feature model fits the data way better than just using one feature, but we won't complicate it with all the 23 features.
-
-**What Types of Features Made the Cut:** We ended up with a good mix: - Payment history from different months (PAY_0 through PAY_5) - Payment amounts and bill amounts - Personal info like marital status, gender, education, and age - Credit limit information
-
-This makes sense because defaults aren't just about one thing, they depend on recent behavior, how much someone owes, and personal circumstances.
 
 ## Feature Importance and Coefficients
 
@@ -370,51 +342,6 @@ model_coef$OR_CI_Upper <- round(odds_ci[match(model_coef$Feature, rownames(odds_
 print(model_coef)
 ```
 
-## What Our Coefficients Tell Us
-
-Looking at our model, one thing stands out clearly: **payment history is everything**. How someone has been paying, especially recently, is by far the strongest predictor of whether they'll default or not:
-
-**The Biggest Risk Factors (Make Default More Likely):**
-
--   **PAY_0 (coefficient: 0.577)** - This is the powerhouse. PAY_0 measures recent payment status, and it's the single strongest predictor. The confidence interval is [0.536, 0.619], which is tight and doesn't include zero, meaning we're really confident this feature matters alot. Basically, if someone has had recent payment delays, their default risk jump up.
-
--   **PAY_2 and PAY_3 (coefficients: 0.107 and 0.068)** - These measure payment status from 2 and 3 months ago. Interestingly, they're still important even though they're older data, which suggests that if someone has a pattern of paying late, it keeps affecting their risk.
-
--   **PAY_5 (positive but smaller coefficient)** - Payment status from 5 months ago still matters, but the effect gets weaker as we go back in time.
-
-**The Protective Factors (Make Default Less Likely):**
-
--   **MARRIAGE (coefficient: -0.156, CI: [-0.230, -0.082])** - Married customers have a lower default risk. [1 = married, 2 = single, 3 = others] The negative coefficient shows that marital stability is a protective factor against default.
-
--   **EDUCATION (coefficient: -0.105, CI: [-0.154, -0.056])** - Customers with higher education levels are less likely to default. [1 = graduate school, 2 = university, 3 = high school, 4 = others] This could reflect higher income stability or better financial management.
-
--   **SEX (coefficient: -0.104, CI: [-0.176, -0.032])** - One gender has lower default risk than the other. [1 = male, 2 = female] The negative coefficient indicates this protective effect is statistically significant.
-
--   **Payment Amounts (PAY_AMT1-6)** - Customers who make larger payments are much less likely to default. This actually makes an intuitive sense, because if you're paying off your card, you're not going to default.
-
--   **LIMIT_BAL (very small negative coefficient)** - Higher credit limits are associated with lower default risk, probably because banks give bigger limits to safer customers.
-
-**Statistical Confidence:** Most coefficients show very strong evidence (p \< 0.001, marked with \*\*\*), meaning we're really confident these effects are real. A couple of features like PAY_AMT3 and BILL_AMT2 aren't quite statistically significant on their own, but the model still includes them because they help reduce AIC overall, which improves our model's fit.
-
-### Odds Ratios Impact
-
-While coefficients tell us direction and statistical significance, **odds ratios** (shown in the table above) tell us the practical impact in a more intuitive way.
-
--   **Odds Ratio = 1.00**: No effect on default risk
--   **Odds Ratio \> 1.00**: Increases default risk (every unit increase multiplies odds by this amount)
--   **Odds Ratio \< 1.00**: Decreases default risk (protective factor)
-
-**From Our Model:**
-
--   **PAY_0 (OR = 1.78, 95% CI: [1.71, 1.86])**: For each one-unit increase in recent payment delay status, the odds of default multiply by about 1.78, which is about **78% increase** in default odds. This is huge and it's our strongest predictor. The narrow confidence interval shows we're very confident this effect is real.
-
--   **MARRIAGE (OR = 0.86, 95% CI: [0.79, 0.92])**: Being married multiplies the odds of default by 0.86, which means it **reduces** the odds by about 14%. Married people are actually lower risk.
-
--   **EDUCATION (OR = 0.90, 95% CI: [0.86, 0.95])**: Higher education level multiplies odds by 0.90 - a **10% reduction** in default odds. Education is a meaningful protective factor.
-
--   **PAY_AMT1 (OR \~= 0.9999)**: The odds ratio is extremely close to 1 because payment amounts are in thousands. Each additional dollar has a tiny protective effect, but the aggregate effect of large payments is meaningful.
-
-Odds ratios make it much easier to communicate results: an odds ratio of 1.78 is "a big deal" - every step up in payment delay increases your default risk by 78%. An odds ratio of 0.90 is "meaningful but modest" - a real protective effect but not so dramatic.
 
 ## Feature Importance Visualization with Confidence Intervals
 
@@ -578,15 +505,6 @@ cat("Balanced Accuracy:     ", round(metrics["Balanced Accuracy"], 4), "\n")
 cat("AUC:                   ", round(auc_value, 4), "\n")
 ```
 
-## What These Metrics Mean
-
--   **Accuracy**: How many predictions are correct overall (out of all predictions)
--   **Sensitivity**: Of people who actually defaulted, how many did we catch?
--   **Specificity**: Of people who didn't default, how many did we correctly identify?
--   **Precision**: When we predict someone will default, how often are we right?
--   **Balanced Accuracy**: Average of sensitivity and specificity - a fairer measure when data is imbalanced
-
-## How Well Did Our Model Work?
 
 ### Performance Metrics Summary
 
@@ -599,45 +517,7 @@ cat("AUC:                   ", round(auc_value, 4), "\n")
 | Balanced Accuracy | 60.98% | Average performance accounting for class imbalance     |
 | AUC               | 0.7250 | Discrimination ability between default and non-default |
 
-### Detailed Performance Analysis
 
-**Accuracy (81.20% with 95% CI: [80.38%, 82.00%])** - Our model correctly predicts whether a customer will default or not 81.20% of the time. This means that out of every 100 customers in the test set, the model makes correct predictions for about 81 of them. The narrow confidence interval shows that this result is fairly reliable and wouldn't change much if we tested on different data.
-
-**Sensitivity (24.72%): Default Detection Rate** - This is actually one of the challenging aspects of our model. The model only catches about 24.72% of customers who actually default. In practical terms, if there are 100 customers who will truly default, our model would identify only about 25 of them. This means we miss 75% of the actual defaults (false negatives). This low sensitivity happens because our model is being conservative - it's trying hard not to falsely alarm customers who won't default.
-
-**Specificity (97.23%): Non-Default Identification** - On the flip side, our model is very good at identifying customers who will NOT default. It correctly identifies 97.23% of non-defaulters. This is actually a strength because it means we rarely bother customers who are good payers with unnecessary interventions or warnings.
-
-**Precision (71.72%): Prediction Reliability** - When our model predicts that someone will default, it's correct about 71.72% of the time. This means if we act on the model's default predictions, we can be fairly confident that most of those customers are actually at risk.
-
-**Balanced Accuracy (60.98%)** - Since our dataset is imbalanced (22% defaults, 78% non-defaults), we use balanced accuracy to get a fair picture. This gives equal weight to sensitivity and specificity, showing that on average, our model performs moderately well on both classes.
-
-**AUC (0.7250): Model Discrimination Ability** - This tells us how well our model can distinguish between defaulters and non-defaulters at different probability thresholds. A score of 0.72 is reasonably good (better than 0.50 which is random), though there's definitely room for improvement toward 0.80 or higher.
-
-### What the Trade-offs Mean
-
-Notice something interesting: our model is very cautious. It's fantastic at identifying customers who are fine (97% specificity) but misses quite a few who actually default (only 25% sensitivity). Why? Because:
-
-1.  Most people don't default, so the model learns that "non-default" is the safer prediction
-2.  The 0.5 cutoff (we say "default" if probability \> 0.5) was kind of arbitrary - we could change it
-3.  Our training data naturally has this imbalance, so the model reflects it
-
-In the real world, this kind of model would probably be used to flag high-risk customers for extra attention, not as the only tool for making decisions about who gets credit.
-
-### Practical Uses and Limitations
-
--   **Good at**: Not bothering customers who are fine (97% of non-defaulters get flagged as safe)
-
--   **Not great at**: Catching all the risky customers (we'd miss 75% of actual defaults)
-
--   **Works best for**: Obvious risk cases like recent late payments or very old accounts
-
--   **Might miss**: Defaults by customers who seemed fine until suddenly they weren't
-
--   **Could be improved**: If we adjust the threshold to be more aggressive, we'd catch more defaults, but we'd also bother more good customers
-
-## ROC Curve and AUC
-
-The ROC curve shows us how good our model is at distinguishing between defaulters and non-defaulters, across all possible decision thresholds.
 
 ```{r roc-curve, fig.width=8, fig.height=6}
 # Create a clean ROC plot from scratch
@@ -659,23 +539,3 @@ lines(roc_obj$specificities, roc_obj$sensitivities, col = "steelblue", lwd = 2)
 legend("bottomright", paste("AUC =", round(auc_value, 4)),
             cex = 1.1, bty = "o", bg = "white")
 ```
-
-### Understanding Our AUC Score
-
-**AUC: 0.7250**
-
-AUC tells us how well the model can separate defaulters from non-defaulters..
-
-The ROC curve itself shows the different trade-offs we face. Right now we're using 0.5 as the cutoff (predict default if probability \> 0.5). But we could slide that threshold left or right depending on what matters more to us: catching defaults or avoiding false alarms. The curve shows all those options.
-
-## Conclusion
-
-Building a predictive model for credit card defaults is not a simple task, and our model reflects this complexity. The results show that we have developed a reasonably effective tool, though it comes with both strengths and limitations that must be understood before implementation.
-
-On the positive side, our model achieves 81% overall accuracy, correctly classifying most customers in our test set. When the model predicts that a customer is safe, it is correct approximately 97% of the time. This high specificity means that the model rarely triggers false alarms for good customers, which is valuable for maintaining customer relationships. Additionally, when the model does flag someone as being at risk of default, it is correct about 72% of the time, making these predictions meaningful enough to warrant further investigation. Perhaps most importantly, the risk factors our model identified align well with intuition: recent payment delays indicate higher risk, while factors like marital stability and higher education levels are protective.
-
-However, there are significant limitations we must acknowledge. The model only catches about 25% of customers who actually default, which means we miss three-quarters of the people who will truly default. This happens because most customers don't default, so the model learns to be very conservative in its predictions, favoring the safer assumption. The AUC of 0.72 indicates decent discriminatory ability but leaves room for improvement. These limitations suggest that relying solely on this model for credit decisions would be insufficient.
-
-The practical application of this model is therefore best understood as part of a larger risk management system. Rather than using it as the sole decision-making tool, the model works best as a screening mechanism to identify the highest-confidence default cases for closer manual review. Banks might use these predictions to flag customers for additional scrutiny, to combine with other assessment methods, or to adjust their lending strategies accordingly. The trade-off is clear: if we wanted to catch more defaults, we could lower the decision threshold, but this would inevitably increase false alarms for good customers.
-
-In all, our analysis confirms what many financial institutions already understand: payment history is the strongest predictor of default risk. Recent payment behavior, more than any other factor, reveals a customer's likelihood to default. Our model provides empirical support for this intuition and demonstrates that while predicting defaults is challenging, it is possible to build models that add value to decision-making processes when used appropriately within a broader framework.
