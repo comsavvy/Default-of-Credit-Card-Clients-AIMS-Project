@@ -410,6 +410,40 @@ train_model <- glm(`default payment next month` ~ PAY_0 + PAY_2 + PAY_3 + PAY_5 
 summary(train_model)
 ```
 
+## Model Diagnostics: Residual Plot and Q-Q Plot
+
+Let's examine the model's residuals to check if our assumptions are met. The residual plot shows if there are any patterns or problems with our predictions. The Q-Q plot checks if the residuals follow a normal distribution, which is an assumption of logistic regression.
+
+```{r model-diagnostics, fig.width=12, fig.height=6}
+# Calculate residuals and fitted values
+residuals_model <- residuals(train_model, type = "deviance")
+fitted_values <- fitted(train_model)
+
+# Create a 2x2 layout for diagnostics
+par(mfrow = c(1, 2))
+
+# Residual Plot: Residuals vs Fitted Values
+plot(fitted_values, residuals_model,
+     main = "Residual Plot: Residuals vs Fitted Values",
+     xlab = "Fitted Values (Predicted Probability)",
+     ylab = "Deviance Residuals",
+     pch = 16,
+     col = rgb(0, 0, 0, 0.4),
+     cex = 0.6)
+abline(h = 0, col = "red", lty = 2, lwd = 2)
+lines(lowess(fitted_values, residuals_model), col = "blue", lwd = 2)
+
+# Q-Q Plot: Normal Probability Plot
+qqnorm(residuals_model,
+       main = "Q-Q Plot: Standardized Residuals",
+       pch = 16,
+       col = rgb(0, 0, 0, 0.4),
+       cex = 0.6)
+qqline(residuals_model, col = "red", lwd = 2)
+
+par(mfrow = c(1, 1))
+```
+
 ## Model Predictions
 
 Now we use the trained model to make predictions on the test set we put aside earlier.
